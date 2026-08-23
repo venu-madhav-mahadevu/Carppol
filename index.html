@@ -300,6 +300,18 @@
   .rpill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
     padding:4px 10px;border-radius:20px;background:var(--paper);border:1px solid var(--line);}
   .rpill .rp-dot{width:8px;height:8px;border-radius:50%;background:#22C55E;}
+  .rpill.active{border-color:#22C55E;background:rgba(34,197,94,.12);color:var(--ink);font-weight:700;}
+  .follow{font-size:12.5px;color:var(--sub);margin:2px 0 2px;}
+  .follow b{color:var(--ink);}
+  /* Leaflet driver markers */
+  .lmk{border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-family:'Fraunces',Georgia,serif;
+    border:2.5px solid #fff;box-shadow:0 3px 10px rgba(16,24,40,.4);}
+  .lmk-active{background:#22C55E;font-size:16px;
+    box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:mkPulse 1.6s infinite;}
+  @keyframes mkPulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}
+    70%{box-shadow:0 0 0 12px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  .lmk-dim{background:#94A3B8;font-size:12px;opacity:.72;}
 
   /* Side alerts (toasts) */
   .alerts{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;
@@ -895,6 +907,7 @@ function liveTrackScreen(){
     `<h2>📍 Live Carpool Map</h2>`+
     `<div class="whoami">Signed in as <b>${esc(myName)}</b>`+
       `<button class="signout" id="fSignout">Sign out</button></div>`+
+    `<div class="follow" id="followLine">No one sharing yet.</div>`+
     `<div class="mapwrap"><div id="liveMap"></div></div>`+
     `<div class="geo-line"><span class="geo-dot" id="geoDot"></span><span id="geoText">Not sharing yet</span></div>`+
     `<button class="mbtn live" id="liveToggle">▶️ Share my live location</button>`+
@@ -905,6 +918,12 @@ function liveTrackScreen(){
   liveModal.querySelector('#liveToggle').addEventListener('click',toggleShare);
   setTimeout(initMap,60); // let the modal lay out first
   listenLocations();
+}
+function makeMarkerIcon(name,active){
+  const initial=esc(((name||'?').trim()[0]||'?').toUpperCase());
+  const size=active?38:26;
+  return L.divIcon({className:'',iconSize:[size,size],iconAnchor:[size/2,size/2],
+    html:`<div class="lmk ${active?'lmk-active':'lmk-dim'}" style="width:${size}px;height:${size}px">${initial}</div>`});
 }
 function initMap(){
   if(!window.L){liveModal.querySelector('#geoText').textContent='Map library did not load.';return;}
@@ -924,23 +943,48 @@ function listenLocations(){
       if(v.ts && now-v.ts>5*60*1000) return; // hide >5 min stale
       fresh[uid]=v;
     });
+    // Preference: the most-recently-updated sharer is the "active" car
+    let activeUid=null, bestTs=-1;
+    Object.entries(fresh).forEach(([uid,v])=>{if((v.ts||0)>bestTs){bestTs=v.ts||0;activeUid=uid;}});
+    const myUid=currentUser&&currentUser.uid;
+
     if(map){
       // remove markers that are gone
       Object.keys(markers).forEach(uid=>{if(!fresh[uid]){map.removeLayer(markers[uid]);delete markers[uid];}});
       Object.entries(fresh).forEach(([uid,v])=>{
-        if(markers[uid]) markers[uid].setLatLng([v.lat,v.lng]);
-        else markers[uid]=L.marker([v.lat,v.lng]).addTo(map);
-        markers[uid].bindTooltip((v.name||'Driver')+(uid===(currentUser&&currentUser.uid)?' (you)':''),
-          {permanent:true,direction:'top',offset:[0,-8]});
+        const active=uid===activeUid;
+        if(markers[uid]){
+          markers[uid].setLatLng([v.lat,v.lng]);
+          if(markers[uid]._active!==active){markers[uid].setIcon(makeMarkerIcon(v.name,active));markers[uid]._active=active;}
+        }else{
+          markers[uid]=L.marker([v.lat,v.lng],{icon:makeMarkerIcon(v.name,active),zIndexOffset:active?1000:0}).addTo(map);
+          markers[uid]._active=active;
+        }
+        markers[uid].setZIndexOffset(active?1000:0);
+        markers[uid].bindTooltip((v.name||'Driver')+(uid===myUid?' (you)':'')+(active?' · live':''),
+          {permanent:true,direction:'top',offset:[0,-14]});
       });
-      const pts=Object.values(fresh).map(v=>[v.lat,v.lng]);
-      if(pts.length) map.fitBounds(pts,{maxZoom:15,padding:[30,30]});
+      // Follow the active car (smooth pan, keep zoom)
+      if(activeUid && fresh[activeUid]){
+        const a=fresh[activeUid];
+        map.panTo([a.lat,a.lng],{animate:true});
+        if(map.getZoom()<13) map.setZoom(14);
+      }
     }
+    // Follow line
+    const fl=liveModal.querySelector('#followLine');
+    if(fl){
+      fl.innerHTML=activeUid
+        ? `🚗 Following <b>${esc(fresh[activeUid].name||'Driver')}</b> — most recent update`
+        : `No one sharing yet.`;
+    }
+    // Roster (active one flagged)
     const roster=liveModal.querySelector('#roster');
     if(roster){
-      const names=Object.values(fresh).map(v=>v.name||'Driver');
-      roster.innerHTML=names.length
-        ? names.map(n=>`<span class="rpill"><span class="rp-dot"></span>${esc(n)}</span>`).join('')
+      const entries=Object.entries(fresh);
+      roster.innerHTML=entries.length
+        ? entries.map(([uid,v])=>`<span class="rpill${uid===activeUid?' active':''}">`+
+            `<span class="rp-dot"></span>${esc(v.name||'Driver')}${uid===activeUid?' 🚗':''}</span>`).join('')
         : `<span class="rpill" style="color:var(--muted)">No one sharing right now</span>`;
     }
   });
