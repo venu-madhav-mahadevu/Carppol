@@ -617,13 +617,10 @@ function showAlert(a,delay){
   el.style.animationDelay=delay+'s';
   el.innerHTML=`<div class="aicon">${a.icon}</div>`+
     `<div class="abody"><div class="atitle">${a.title}</div><div class="atext">${a.text}</div></div>`+
-    `<button class="aclose" aria-label="Dismiss">×</button>`+
-    `<div class="abar" style="--life:9s;animation-delay:${delay}s"></div>`;
+    `<button class="aclose" aria-label="Dismiss">×</button>`;
   const close=()=>{el.classList.add('out');setTimeout(()=>el.remove(),350);};
   el.querySelector('.aclose').addEventListener('click',close);
-  let timer=setTimeout(close,(9+delay)*1000);
-  el.addEventListener('mouseenter',()=>clearTimeout(timer));
-  el.addEventListener('mouseleave',()=>{timer=setTimeout(close,4000);});
+  // persistent: no auto-dismiss timer — stays until the user closes it
   alertsBox.appendChild(el);
 }
 function runAlerts(){
