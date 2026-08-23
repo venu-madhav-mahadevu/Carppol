@@ -7,6 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --venu:#4F46E5; --shiva:#0D9488; --charan:#C2620A; --kumar:#DB2777;
@@ -274,6 +279,27 @@
   .mbtn.live{background:#22C55E;color:#fff;border-color:transparent;}
   .mbtn.live.stop{background:var(--charan);}
   .mbtn.maps{border-color:var(--shiva);color:var(--shiva);}
+  #liveMap{width:100%;height:100%;background:var(--holiday);}
+  .leaflet-container{font:inherit;border-radius:0;}
+  /* Auth form */
+  .fform{display:flex;flex-direction:column;gap:10px;margin:6px 0 4px;}
+  .finput{width:100%;font:inherit;font-size:14px;padding:11px 13px;border-radius:12px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);}
+  .finput:focus{outline:none;border-color:var(--venu);box-shadow:0 0 0 3px rgba(79,70,229,.15);}
+  .fselect{width:100%;font:inherit;font-size:14px;padding:11px 13px;border-radius:12px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);}
+  .ferror{font-size:12px;color:var(--kumar);font-weight:600;min-height:15px;line-height:1.3;}
+  .fmini{font-size:12px;color:var(--sub);text-align:center;margin-top:6px;}
+  .fmini a{color:var(--venu);font-weight:600;cursor:pointer;text-decoration:none;}
+  .whoami{display:flex;align-items:center;gap:9px;margin-bottom:12px;font-size:12.5px;color:var(--sub);}
+  .whoami b{color:var(--ink);}
+  .whoami .signout{margin-left:auto;font-size:12px;font-weight:600;color:var(--kumar);
+    background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:8px;}
+  .whoami .signout:hover{background:var(--holiday);}
+  .roster{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px;}
+  .rpill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+    padding:4px 10px;border-radius:20px;background:var(--paper);border:1px solid var(--line);}
+  .rpill .rp-dot{width:8px;height:8px;border-radius:50%;background:#22C55E;}
 
   /* Side alerts (toasts) */
   .alerts{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;
@@ -407,7 +433,7 @@ const PCLASS = {'Venu':'venu','Shiva':'shiva','Charan':'charan','Kumar':'kumar'}
 /* ===== EDIT HERE: driver phone numbers (country code + number, digits only) =====
    Example for a US number 510-555-0123  ->  '15105550123'                     */
 const CONTACTS = {
-  'Venu':   '',
+  'Venu':   '16693062113',
   'Shiva':  '',
   'Charan': '',
   'Kumar':  ''
@@ -415,6 +441,16 @@ const CONTACTS = {
 // Paste your WhatsApp group invite link here (https://chat.whatsapp.com/....) or leave '' :
 const GROUP_WHATSAPP = '';
 const SCHOOL_URL = 'https://fremontunified.org/thornton/';
+
+/* ===== EDIT HERE: paste your Firebase project config (Console → Project settings → Web app)
+   These values are safe to be public. Live tracking stays disabled until apiKey is filled. */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  appId: ""
+};
 /* ================================================================================ */
 
 const FRIDAY = {
@@ -766,69 +802,182 @@ document.getElementById('contactBtn').addEventListener('click',openContacts);
 overlay.addEventListener('click',e=>{if(e.target===overlay)closeContacts();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeContacts();});
 
-// ---- Live location ----
+// ---- Live location (Firebase auth + shared live map) ----
 const liveOverlay=document.getElementById('liveOverlay');
 const liveModal=document.getElementById('liveModal');
-let watchId=null, lastPos=null;
-function liveShell(){
+let fbAuth=null, fbDb=null, currentUser=null, fbOK=false;
+let watchId=null, map=null, markers={}, locRef=null, myName='';
+let authMode='login';
+
+// Init Firebase once (if configured)
+(function initFirebase(){
+  try{
+    if(typeof firebase!=='undefined' && FIREBASE_CONFIG.apiKey){
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbAuth=firebase.auth(); fbDb=firebase.database(); fbOK=true;
+      fbAuth.onAuthStateChanged(u=>{
+        currentUser=u;
+        if(liveOverlay.classList.contains('open')) routeLive();
+      });
+    }
+  }catch(e){console.warn('Firebase init failed:',e);}
+})();
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function routeLive(){
+  if(!fbOK){ liveSetupScreen(); return; }
+  if(!currentUser){ liveLoginScreen(); return; }
+  liveTrackScreen();
+}
+
+// ----- Screen 1: setup required -----
+function liveSetupScreen(){
   liveModal.innerHTML=
     `<button class="mclose" id="lcloseBtn" aria-label="Close">×</button>`+
-    `<h2>📍 Live Location</h2>`+
-    `<div class="msub">See the carpool's position on a map and share it with the group.</div>`+
-    `<div class="mapwrap"><div class="mapmsg" id="mapMsg">Tap “Start live location” to show your position on the map.</div>`+
-      `<iframe id="mapFrame" title="map" loading="lazy" style="display:none" referrerpolicy="no-referrer-when-downgrade"></iframe></div>`+
-    `<div class="geo-line"><span class="geo-dot" id="geoDot"></span><span id="geoText">Location off</span></div>`+
-    `<button class="mbtn live" id="liveToggle">▶️ Start live location</button>`+
-    `<a class="mbtn maps" id="openMaps" target="_blank" rel="noopener" style="pointer-events:none;opacity:.4">🗺️ Open in Google Maps</a>`+
-    `<a class="mbtn group" id="shareLoc" style="pointer-events:none;opacity:.4">💬 Share location to carpool</a>`+
-    `<div class="mnote">🔴 <b>For real-time group tracking</b>, use WhatsApp → the carpool chat → 📎 Attach → <b>Location → Share live location</b>. This page shows and shares <b>your own</b> device's position.</div>`;
+    `<h2>📍 Live Tracking</h2>`+
+    `<div class="msub">Real per-driver login &amp; a shared live map — needs a free Firebase project.</div>`+
+    `<div class="mnote">To turn this on:<br>1. Create a free project at <b>console.firebase.google.com</b><br>`+
+      `2. Add a <b>Web app</b>, enable <b>Authentication → Email/Password</b>, and create a <b>Realtime Database</b><br>`+
+      `3. Paste the config into <b>FIREBASE_CONFIG</b> near the top of the page’s script<br>`+
+      `4. Add each driver as a user (Authentication → Users)</div>`+
+    `<div class="mnote">Until then, drivers can still share position via WhatsApp from the 📞 Contacts popup.</div>`;
   liveModal.querySelector('#lcloseBtn').addEventListener('click',closeLive);
-  liveModal.querySelector('#liveToggle').addEventListener('click',toggleLive);
 }
-function updateLive(pos){
-  lastPos=pos;
-  const {latitude:la,longitude:lo,accuracy:ac}=pos.coords;
-  const q=`${la.toFixed(6)},${lo.toFixed(6)}`;
-  const frame=liveModal.querySelector('#mapFrame');
-  const msg=liveModal.querySelector('#mapMsg');
-  frame.src=`https://maps.google.com/maps?q=${q}&z=16&output=embed`;
-  frame.style.display='block'; msg.style.display='none';
-  liveModal.querySelector('#geoText').textContent=`${q}  ·  ±${Math.round(ac)} m`;
-  liveModal.querySelector('#geoDot').classList.add('on');
-  const mapsUrl=`https://www.google.com/maps?q=${q}`;
-  const om=liveModal.querySelector('#openMaps');
-  om.href=mapsUrl; om.style.pointerEvents=''; om.style.opacity='';
-  const sh=liveModal.querySelector('#shareLoc');
-  const text=encodeURIComponent(`🚗 Carpool live location: ${mapsUrl}`);
-  sh.href=`https://wa.me/?text=${text}`; sh.target='_blank'; sh.rel='noopener';
-  sh.style.pointerEvents=''; sh.style.opacity='';
+
+// ----- Screen 2: login / sign up -----
+function liveLoginScreen(){
+  const isLogin=authMode==='login';
+  liveModal.innerHTML=
+    `<button class="mclose" id="lcloseBtn" aria-label="Close">×</button>`+
+    `<h2>${isLogin?'🔐 Driver Login':'🆕 Create Driver Account'}</h2>`+
+    `<div class="msub">${isLogin?'Log in to share and see live carpool locations.':'Set up your driver account for live tracking.'}</div>`+
+    `<div class="fform">`+
+      (isLogin?'':`<select class="fselect" id="fName"><option value="">— Which driver are you? —</option>`+
+        NAMES.map(n=>`<option value="${n}">${n}</option>`).join('')+`</select>`)+
+      `<input class="finput" id="fEmail" type="email" placeholder="Email" autocomplete="username">`+
+      `<input class="finput" id="fPass" type="password" placeholder="Password (min 6 chars)" autocomplete="${isLogin?'current-password':'new-password'}">`+
+      `<div class="ferror" id="fErr"></div>`+
+      `<button class="mbtn live" id="fSubmit">${isLogin?'Log in':'Create account'}</button>`+
+    `</div>`+
+    `<div class="fmini">${isLogin?`New driver? <a id="fSwap">Create an account</a>`:`Already have one? <a id="fSwap">Log in</a>`}</div>`;
+  liveModal.querySelector('#lcloseBtn').addEventListener('click',closeLive);
+  liveModal.querySelector('#fSwap').addEventListener('click',()=>{authMode=isLogin?'signup':'login';liveLoginScreen();});
+  liveModal.querySelector('#fSubmit').addEventListener('click',submitAuth);
+  liveModal.querySelector('#fPass').addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth();});
 }
-function liveError(err){
-  const msg=liveModal.querySelector('#mapMsg');
-  const t={1:'Location permission was blocked. Allow it in your browser to use this.',
-    2:'Position unavailable right now. Try again outdoors or with GPS on.',
-    3:'Timed out getting your location. Try again.'}[err.code]||'Could not get your location.';
-  if(msg){msg.textContent='⚠️ '+t;}
-  liveModal.querySelector('#geoText').textContent='Location error';
-  stopLive();
+function submitAuth(){
+  const email=liveModal.querySelector('#fEmail').value.trim();
+  const pass=liveModal.querySelector('#fPass').value;
+  const errEl=liveModal.querySelector('#fErr');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Enter your email and password.';return;}
+  const btn=liveModal.querySelector('#fSubmit'); btn.textContent='Please wait…';
+  const done=e=>{btn.textContent=authMode==='login'?'Log in':'Create account';
+    errEl.textContent=(e&&e.message)?e.message.replace('Firebase: ','') : 'Something went wrong.';};
+  if(authMode==='login'){
+    fbAuth.signInWithEmailAndPassword(email,pass).catch(done);
+  }else{
+    const nm=liveModal.querySelector('#fName').value;
+    if(!nm){errEl.textContent='Pick which driver you are.';btn.textContent='Create account';return;}
+    fbAuth.createUserWithEmailAndPassword(email,pass)
+      .then(cred=>cred.user.updateProfile({displayName:nm}))
+      .then(()=>routeLive())
+      .catch(done);
+  }
 }
-function startLive(){
-  if(!('geolocation' in navigator)){liveModal.querySelector('#mapMsg').textContent='⚠️ Geolocation is not supported on this device/browser.';return;}
+
+// ----- Screen 3: live tracking map -----
+function liveTrackScreen(){
+  myName=(currentUser.displayName)|| (currentUser.email||'Driver').split('@')[0];
+  liveModal.innerHTML=
+    `<button class="mclose" id="lcloseBtn" aria-label="Close">×</button>`+
+    `<h2>📍 Live Carpool Map</h2>`+
+    `<div class="whoami">Signed in as <b>${esc(myName)}</b>`+
+      `<button class="signout" id="fSignout">Sign out</button></div>`+
+    `<div class="mapwrap"><div id="liveMap"></div></div>`+
+    `<div class="geo-line"><span class="geo-dot" id="geoDot"></span><span id="geoText">Not sharing yet</span></div>`+
+    `<button class="mbtn live" id="liveToggle">▶️ Share my live location</button>`+
+    `<div class="roster" id="roster"></div>`+
+    `<div class="mnote">Your location streams live to every signed-in driver while sharing is on. Turn it off (or close) to stop.</div>`;
+  liveModal.querySelector('#lcloseBtn').addEventListener('click',closeLive);
+  liveModal.querySelector('#fSignout').addEventListener('click',()=>{stopSharing();fbAuth.signOut();});
+  liveModal.querySelector('#liveToggle').addEventListener('click',toggleShare);
+  setTimeout(initMap,60); // let the modal lay out first
+  listenLocations();
+}
+function initMap(){
+  if(!window.L){liveModal.querySelector('#geoText').textContent='Map library did not load.';return;}
+  const el=document.getElementById('liveMap'); if(!el||map) return;
+  map=L.map(el,{zoomControl:true}).setView([37.5485,-121.9886],12); // Fremont default
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  setTimeout(()=>map&&map.invalidateSize(),120);
+}
+function listenLocations(){
+  locRef=fbDb.ref('locations');
+  locRef.on('value',snap=>{
+    const data=snap.val()||{};
+    const now=Date.now(), fresh={};
+    Object.entries(data).forEach(([uid,v])=>{
+      if(!v||typeof v.lat!=='number') return;
+      if(v.ts && now-v.ts>5*60*1000) return; // hide >5 min stale
+      fresh[uid]=v;
+    });
+    if(map){
+      // remove markers that are gone
+      Object.keys(markers).forEach(uid=>{if(!fresh[uid]){map.removeLayer(markers[uid]);delete markers[uid];}});
+      Object.entries(fresh).forEach(([uid,v])=>{
+        if(markers[uid]) markers[uid].setLatLng([v.lat,v.lng]);
+        else markers[uid]=L.marker([v.lat,v.lng]).addTo(map);
+        markers[uid].bindTooltip((v.name||'Driver')+(uid===(currentUser&&currentUser.uid)?' (you)':''),
+          {permanent:true,direction:'top',offset:[0,-8]});
+      });
+      const pts=Object.values(fresh).map(v=>[v.lat,v.lng]);
+      if(pts.length) map.fitBounds(pts,{maxZoom:15,padding:[30,30]});
+    }
+    const roster=liveModal.querySelector('#roster');
+    if(roster){
+      const names=Object.values(fresh).map(v=>v.name||'Driver');
+      roster.innerHTML=names.length
+        ? names.map(n=>`<span class="rpill"><span class="rp-dot"></span>${esc(n)}</span>`).join('')
+        : `<span class="rpill" style="color:var(--muted)">No one sharing right now</span>`;
+    }
+  });
+}
+function toggleShare(){ watchId===null?startSharing():stopSharing(); }
+function startSharing(){
+  if(!('geolocation' in navigator)){liveModal.querySelector('#geoText').textContent='⚠️ Geolocation not supported.';return;}
   const btn=liveModal.querySelector('#liveToggle');
-  btn.textContent='⏸️ Stop live location'; btn.classList.add('stop');
+  btn.textContent='⏸️ Stop sharing'; btn.classList.add('stop');
   liveModal.querySelector('#geoText').textContent='Locating…';
-  watchId=navigator.geolocation.watchPosition(updateLive,liveError,
-    {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+  const myRef=fbDb.ref('locations/'+currentUser.uid);
+  myRef.onDisconnect().remove();
+  watchId=navigator.geolocation.watchPosition(pos=>{
+    const {latitude:lat,longitude:lng,accuracy:ac}=pos.coords;
+    myRef.set({name:myName,lat,lng,ts:Date.now()});
+    liveModal.querySelector('#geoText').textContent=`Sharing · ${lat.toFixed(5)}, ${lng.toFixed(5)} · ±${Math.round(ac)} m`;
+    liveModal.querySelector('#geoDot').classList.add('on');
+  },err=>{
+    const t={1:'Location permission blocked — allow it in your browser.',2:'Position unavailable right now.',3:'Timed out getting location.'}[err.code]||'Location error.';
+    liveModal.querySelector('#geoText').textContent='⚠️ '+t; stopSharing();
+  },{enableHighAccuracy:true,maximumAge:4000,timeout:15000});
 }
-function stopLive(){
+function stopSharing(){
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  if(fbDb&&currentUser){fbDb.ref('locations/'+currentUser.uid).remove();}
   const btn=liveModal.querySelector('#liveToggle');
-  if(btn){btn.textContent='▶️ Start live location';btn.classList.remove('stop');}
+  if(btn){btn.textContent='▶️ Share my live location';btn.classList.remove('stop');}
   const dot=liveModal.querySelector('#geoDot'); if(dot) dot.classList.remove('on');
+  const txt=liveModal.querySelector('#geoText'); if(txt) txt.textContent='Not sharing';
 }
-function toggleLive(){ watchId===null?startLive():stopLive(); }
-function openLive(){liveShell();liveOverlay.classList.add('open');}
-function closeLive(){stopLive();liveOverlay.classList.remove('open');}
+function openLive(){ liveOverlay.classList.add('open'); routeLive(); }
+function closeLive(){
+  stopSharing();
+  if(locRef){locRef.off();locRef=null;}
+  if(map){map.remove();map=null;markers={};}
+  liveOverlay.classList.remove('open');
+}
 document.getElementById('liveBtn').addEventListener('click',openLive);
 liveOverlay.addEventListener('click',e=>{if(e.target===liveOverlay)closeLive();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLive();});
