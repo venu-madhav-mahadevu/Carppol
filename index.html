@@ -210,6 +210,52 @@
   .rider .rwith b{color:var(--rc);font-weight:700;}
   @media (max-width:400px){.rider-grid{grid-template-columns:1fr;}}
 
+  /* Contacts modal */
+  .overlay{position:fixed;inset:0;z-index:10001;display:none;align-items:center;justify-content:center;
+    padding:18px;background:rgba(10,14,20,.55);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);}
+  .overlay.open{display:flex;animation:ovFade .22s ease;}
+  @keyframes ovFade{from{opacity:0}to{opacity:1}}
+  .modal{width:100%;max-width:400px;max-height:88vh;overflow:auto;background:var(--card);
+    border:1px solid var(--glass-brd);border-radius:22px;position:relative;
+    box-shadow:0 34px 80px -24px rgba(0,0,0,.55);padding:20px 18px 16px;
+    animation:riseIn .34s cubic-bezier(.2,.7,.3,1);}
+  .modal::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;border-radius:22px 22px 0 0;
+    background:linear-gradient(90deg,var(--venu),var(--shiva) 38%,var(--charan) 68%,var(--kumar));}
+  .modal h2{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;margin-bottom:4px;
+    display:flex;align-items:center;gap:8px;}
+  .modal .msub{font-size:12.5px;color:var(--sub);margin-bottom:15px;}
+  .mclose{position:absolute;top:14px;right:14px;width:30px;height:30px;border:1px solid var(--line);
+    background:var(--card);color:var(--muted);font-size:18px;line-height:1;cursor:pointer;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;}
+  .mclose:hover{color:var(--ink);border-color:var(--muted);}
+  .contact{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:14px;
+    background:var(--paper);border:1px solid var(--line);margin-bottom:10px;}
+  .contact .cav{width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:700;font-size:16px;font-family:'Fraunces',Georgia,serif;
+    background:var(--cg);box-shadow:0 5px 13px -5px rgba(16,24,40,.5);}
+  .contact .cinfo{flex:1;min-width:0;}
+  .contact .cname{font-weight:700;font-size:14px;line-height:1.15;}
+  .contact .cnum{font-size:12px;color:var(--sub);margin-top:2px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .contact .cnum.empty{color:var(--charan);font-weight:600;}
+  .cactions{display:flex;gap:6px;flex:none;}
+  .iconbtn{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;text-decoration:none;border:1px solid var(--line);background:var(--card);
+    color:var(--ink);transition:transform .12s,box-shadow .2s;cursor:pointer;}
+  .iconbtn:hover{transform:translateY(-1px);box-shadow:0 5px 12px -5px rgba(16,24,40,.4);}
+  .iconbtn.wa{background:#25D366;color:#fff;border-color:transparent;}
+  .iconbtn.disabled{opacity:.3;pointer-events:none;}
+  .mbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;
+    border-radius:14px;font:inherit;font-size:13.5px;font-weight:700;text-decoration:none;cursor:pointer;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);margin-top:4px;
+    transition:transform .12s,box-shadow .2s,border-color .15s;}
+  .mbtn:hover{transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(16,24,40,.4);}
+  .mbtn.group{background:#25D366;color:#fff;border-color:transparent;}
+  .mbtn.group.disabled{background:var(--holiday);color:var(--muted);border:1px dashed var(--line);
+    pointer-events:none;box-shadow:none;transform:none;}
+  .mbtn.school{margin-top:9px;border-color:var(--venu);color:var(--venu);}
+  .mdivider{height:1px;background:var(--line);margin:14px 0 12px;}
+
   /* Side alerts (toasts) */
   .alerts{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;
     gap:10px;width:300px;max-width:calc(100vw - 28px);pointer-events:none;}
@@ -277,7 +323,12 @@
     <button class="btn" id="printBtn" type="button">🖨️ Print</button>
     <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
     <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
+    <button class="btn" id="contactBtn" type="button">📞 Contacts</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
+  </div>
+
+  <div class="overlay" id="contactOverlay" role="dialog" aria-modal="true" aria-label="Driver contacts">
+    <div class="modal" id="contactModal"></div>
   </div>
 
   <div class="alerts" id="alerts" aria-live="polite"></div>
@@ -328,6 +379,19 @@
 <script>
 const WEEK = {1:'Venu',2:'Shiva',3:'Charan',4:'Kumar'};
 const PCLASS = {'Venu':'venu','Shiva':'shiva','Charan':'charan','Kumar':'kumar'};
+
+/* ===== EDIT HERE: driver phone numbers (country code + number, digits only) =====
+   Example for a US number 510-555-0123  ->  '15105550123'                     */
+const CONTACTS = {
+  'Venu':   '',
+  'Shiva':  '',
+  'Charan': '',
+  'Kumar':  ''
+};
+// Paste your WhatsApp group invite link here (https://chat.whatsapp.com/....) or leave '' :
+const GROUP_WHATSAPP = '';
+const SCHOOL_URL = 'https://fremontunified.org/thornton/';
+/* ================================================================================ */
 
 const FRIDAY = {
   '2026-08-14':'Venu','2026-09-11':'Venu','2026-10-09':'Venu','2026-11-13':'Venu','2027-01-08':'Venu','2027-02-05':'Venu','2027-04-02':'Venu','2027-04-30':'Venu','2027-05-28':'Venu',
@@ -631,6 +695,52 @@ function runAlerts(){
 document.getElementById('alertBtn').addEventListener('click',runAlerts);
 // auto-show shortly after load
 setTimeout(runAlerts,700);
+
+// ---- Contacts modal ----
+const CG={venu:'linear-gradient(150deg,#6366F1,#4338CA)',shiva:'linear-gradient(150deg,#14B8A6,#0F766E)',
+  charan:'linear-gradient(150deg,#EA8420,#B45309)',kumar:'linear-gradient(150deg,#EC4899,#BE185D)'};
+function fmtNum(n){
+  if(n.length===11&&n[0]==='1') return '+1 ('+n.slice(1,4)+') '+n.slice(4,7)+'-'+n.slice(7);
+  return '+'+n;
+}
+function buildContacts(){
+  const modal=document.getElementById('contactModal');
+  let rows='';
+  NAMES.forEach(name=>{
+    const raw=(CONTACTS[name]||'').replace(/\D/g,'');
+    const has=raw.length>=7;
+    const cls=PCLASS[name];
+    const dis=has?'':' disabled';
+    rows+=`<div class="contact">`+
+      `<div class="cav" style="--cg:${CG[cls]}">${name[0]}</div>`+
+      `<div class="cinfo"><div class="cname">${name}</div>`+
+      `<div class="cnum${has?'':' empty'}">${has?fmtNum(raw):'No number yet — add in the file'}</div></div>`+
+      `<div class="cactions">`+
+        `<a class="iconbtn wa${dis}" title="WhatsApp ${name}" ${has?`href="https://wa.me/${raw}" target="_blank" rel="noopener"`:''}>💬</a>`+
+        `<a class="iconbtn${dis}" title="Call ${name}" ${has?`href="tel:+${raw}"`:''}>📞</a>`+
+        `<a class="iconbtn${dis}" title="Text ${name}" ${has?`href="sms:+${raw}"`:''}>✉️</a>`+
+      `</div></div>`;
+  });
+  const groupHas=/^https?:\/\/chat\.whatsapp\.com\//.test(GROUP_WHATSAPP||'');
+  const groupBtn=groupHas
+    ? `<a class="mbtn group" href="${GROUP_WHATSAPP}" target="_blank" rel="noopener">💬 Message the group on WhatsApp</a>`
+    : `<div class="mbtn group disabled">💬 Add your WhatsApp group link in the file</div>`;
+  modal.innerHTML=
+    `<button class="mclose" id="mcloseBtn" aria-label="Close">×</button>`+
+    `<h2>📞 Drivers &amp; Contacts</h2>`+
+    `<div class="msub">Tap 💬 for WhatsApp, 📞 to call, ✉️ to text.</div>`+
+    rows+
+    `<div class="mdivider"></div>`+
+    groupBtn+
+    `<a class="mbtn school" href="${SCHOOL_URL}" target="_blank" rel="noopener">🏫 Thornton Middle School — school website</a>`;
+  modal.querySelector('#mcloseBtn').addEventListener('click',closeContacts);
+}
+const overlay=document.getElementById('contactOverlay');
+function openContacts(){buildContacts();overlay.classList.add('open');}
+function closeContacts(){overlay.classList.remove('open');}
+document.getElementById('contactBtn').addEventListener('click',openContacts);
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeContacts();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeContacts();});
 </script>
 </body>
 </html>
