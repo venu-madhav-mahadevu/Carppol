@@ -303,6 +303,11 @@
   .logrow .ldur{flex:none;font-size:12px;font-weight:700;color:var(--shiva);
     background:var(--holiday);border-radius:20px;padding:4px 10px;white-space:nowrap;}
   .logrow .ldur.live{color:#fff;background:#22C55E;}
+  .logrow.clickable{cursor:pointer;transition:transform .12s,box-shadow .2s,border-color .15s;}
+  .logrow.clickable:hover{transform:translateY(-1px);border-color:var(--shiva);
+    box-shadow:0 6px 14px -7px rgba(16,24,40,.35);}
+  .logrow .lchev{font-size:10.5px;font-weight:600;color:var(--shiva);margin-left:6px;white-space:nowrap;}
+  .cell.school,.cell.holiday{cursor:pointer;}
   .leaflet-container{font:inherit;border-radius:0;}
   /* Auth form */
   .fform{display:flex;flex-direction:column;gap:10px;margin:6px 0 4px;}
@@ -1200,53 +1205,93 @@ function logShell(inner){
     `<h2>🕐 Carpool Timings</h2>`+inner;
   logModal.querySelector('#lgcloseBtn').addEventListener('click',closeLog);
 }
-function openLog(){
+const PGRAD={venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777'};
+let logDateSel=null, logRouteMap=null;
+function openLog(preDate){
   logOverlay.classList.add('open');
   if(!fbOK){ logShell(`<div class="where-empty">Live tracking isn’t set up yet.</div>`); return; }
   if(!currentUser){
-    logShell(`<div class="where-empty">Sign in to view recorded carpool timings.</div>`+
+    logShell(`<div class="where-empty">Sign in to view recorded carpool timings &amp; routes.</div>`+
       `<button class="mbtn live" id="lgLogin">🔐 Sign in</button>`);
     logModal.querySelector('#lgLogin').addEventListener('click',()=>{closeLog();openLive();});
     return;
   }
   const today=localDateStr(Date.now());
+  const sel=(typeof preDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(preDate))?preDate:today;
   logShell(
-    `<div class="msub">Start &amp; end times of every recorded drive on a day.</div>`+
-    `<input class="finput" type="date" id="logDate" value="${today}" max="${today}" style="margin-bottom:12px">`+
+    `<div class="msub">Tap a date to see every recorded drive — start, end, and route.</div>`+
+    `<input class="finput" type="date" id="logDate" value="${sel}" max="${today}" style="margin-bottom:12px">`+
     `<div id="logList"><div class="where-empty">Loading…</div></div>`);
   logModal.querySelector('#logDate').addEventListener('change',e=>renderLog(e.target.value));
-  renderLog(today);
+  renderLog(sel);
 }
 function renderLog(dateStr){
+  logDateSel=dateStr;
+  cleanupRouteMap();
   const list=logModal.querySelector('#logList');
   if(list) list.innerHTML=`<div class="where-empty">Loading…</div>`;
   fbDb.ref('tracks').once('value').then(snap=>{
     const data=snap.val()||{}, rows=[];
-    Object.values(data).forEach(sessions=>{
-      Object.values(sessions||{}).forEach(sess=>{
+    Object.entries(data).forEach(([uid,sessions])=>{
+      Object.entries(sessions||{}).forEach(([sid,sess])=>{
         const meta=sess&&sess.meta; if(!meta||!meta.start) return;
         if(localDateStr(meta.start)!==dateStr) return;
-        rows.push({name:meta.name||'Driver',start:meta.start,end:meta.end||null});
+        rows.push({uid,sid,name:meta.name||'Driver',start:meta.start,end:meta.end||null,hasPoints:!!(sess&&sess.points)});
       });
     });
     rows.sort((a,b)=>a.start-b.start);
     if(!list) return;
     if(!rows.length){list.innerHTML=`<div class="where-empty">No carpool trips recorded on this day.</div>`;return;}
-    list.innerHTML=rows.map(r=>{
-      const cls=PCLASS[r.name]||''; const grad=cls?({venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777'}[cls]):'#94A3B8';
+    list.innerHTML=rows.map((r,i)=>{
+      const grad=PGRAD[PCLASS[r.name]]||'#94A3B8';
       const live=!r.end;
       const dur=live?'● live':durText(r.end-r.start);
-      return `<div class="logrow"><div class="lav" style="--lg:${grad}">${esc((r.name[0]||'?'))}</div>`+
-        `<div class="linfo"><div class="lname">${esc(r.name)}</div>`+
+      return `<div class="logrow${r.hasPoints?' clickable':''}" data-i="${i}">`+
+        `<div class="lav" style="--lg:${grad}">${esc((r.name[0]||'?'))}</div>`+
+        `<div class="linfo"><div class="lname">${esc(r.name)}${r.hasPoints?' <span class="lchev">🗺️ route ›</span>':''}</div>`+
         `<div class="ltime">🟢 <b>${hhmm(r.start)}</b> → ${live?'in progress':('🔴 <b>'+hhmm(r.end)+'</b>')}</div></div>`+
         `<div class="ldur${live?' live':''}">${dur}</div></div>`;
     }).join('');
+    list.querySelectorAll('.logrow.clickable').forEach(el=>{
+      el.addEventListener('click',()=>{const r=rows[+el.dataset.i]; showTrackRoute(r);});
+    });
   }).catch(err=>{ if(list) list.innerHTML=`<div class="where-empty">Couldn’t load timings.<br>${esc(err.message||'')}</div>`; });
 }
-function closeLog(){ logOverlay.classList.remove('open'); }
-document.getElementById('logBtn').addEventListener('click',openLog);
+function showTrackRoute(r){
+  cleanupRouteMap();
+  const list=logModal.querySelector('#logList');
+  const grad=PGRAD[PCLASS[r.name]]||'#22C55E';
+  list.innerHTML=`<button class="mbtn maps" id="logBack" style="margin:0 0 10px">← Back to ${esc(hhmm(r.start))} trips</button>`+
+    `<div class="where-status"><span class="ws-dot on"></span><span><b>${esc(r.name)}</b> · ${hhmm(r.start)}${r.end?` → ${hhmm(r.end)}`:''}</span></div>`+
+    `<div class="mapwrap sm"><div id="logRouteMap"></div></div>`+
+    `<div id="routeMsg" class="ltime" style="text-align:center;margin-top:8px">Loading route…</div>`;
+  list.querySelector('#logBack').addEventListener('click',()=>renderLog(logDateSel));
+  fbDb.ref('tracks/'+r.uid+'/'+r.sid+'/points').once('value').then(snap=>{
+    const pts=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&typeof v.lat==='number') pts.push([v.lat,v.lng]);});
+    const msg=logModal.querySelector('#routeMsg');
+    if(!window.L){ if(msg) msg.textContent='Map library not loaded.'; return; }
+    const el=document.getElementById('logRouteMap'); if(!el) return;
+    logRouteMap=L.map(el,{zoomControl:true}).setView([37.5485,-121.9886],12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(logRouteMap);
+    setTimeout(()=>logRouteMap&&logRouteMap.invalidateSize(),120);
+    if(pts.length<1){ if(msg) msg.textContent='No route points saved for this trip.'; return; }
+    L.polyline(pts,{color:grad,weight:5,opacity:.85,lineCap:'round'}).addTo(logRouteMap);
+    L.circleMarker(pts[0],{radius:6,color:'#fff',weight:2,fillColor:'#22C55E',fillOpacity:1}).addTo(logRouteMap).bindTooltip('Start',{permanent:false});
+    L.circleMarker(pts[pts.length-1],{radius:6,color:'#fff',weight:2,fillColor:'#EF4444',fillOpacity:1}).addTo(logRouteMap).bindTooltip('End',{permanent:false});
+    logRouteMap.fitBounds(pts,{padding:[25,25],maxZoom:16});
+    if(msg) msg.textContent=`${pts.length} points recorded`;
+  }).catch(err=>{const msg=logModal.querySelector('#routeMsg'); if(msg) msg.textContent='Couldn’t load route: '+(err.message||'');});
+}
+function cleanupRouteMap(){ if(logRouteMap){logRouteMap.remove();logRouteMap=null;} }
+function closeLog(){ cleanupRouteMap(); logOverlay.classList.remove('open'); }
+document.getElementById('logBtn').addEventListener('click',()=>openLog());
 logOverlay.addEventListener('click',e=>{if(e.target===logOverlay)closeLog();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLog();});
+// Tap any calendar date to see that day's track log
+document.getElementById('cal').addEventListener('click',e=>{
+  const c=e.target.closest('.cell[data-date]'); if(!c) return;
+  openLog(c.dataset.date);
+});
 </script>
 </body>
 </html>
