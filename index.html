@@ -820,6 +820,7 @@ const liveModal=document.getElementById('liveModal');
 let fbAuth=null, fbDb=null, currentUser=null, fbOK=false;
 let watchId=null, map=null, markers={}, locRef=null, myName='';
 let authMode='login';
+let myTrack=[], sessionId=null, trailLine=null, sessionRef=null;
 
 // Init Firebase once (if configured)
 (function initFirebase(){
@@ -911,11 +912,14 @@ function liveTrackScreen(){
     `<div class="mapwrap"><div id="liveMap"></div></div>`+
     `<div class="geo-line"><span class="geo-dot" id="geoDot"></span><span id="geoText">Not sharing yet</span></div>`+
     `<button class="mbtn live" id="liveToggle">▶️ Share my live location</button>`+
+    `<button class="mbtn maps" id="exportBtn" style="display:none">⬇️ Save this drive (GeoJSON)</button>`+
     `<div class="roster" id="roster"></div>`+
-    `<div class="mnote">Your location streams live to every signed-in driver while sharing is on. Turn it off (or close) to stop.</div>`;
+    `<div class="mnote">Your route is recorded while sharing — the trail shows on the map and each drive can be saved to your Drive. Sharing streams to every signed-in driver; turn it off (or close) to stop.</div>`;
   liveModal.querySelector('#lcloseBtn').addEventListener('click',closeLive);
   liveModal.querySelector('#fSignout').addEventListener('click',()=>{stopSharing();fbAuth.signOut();});
   liveModal.querySelector('#liveToggle').addEventListener('click',toggleShare);
+  liveModal.querySelector('#exportBtn').addEventListener('click',exportTrack);
+  if(myTrack.length>1) liveModal.querySelector('#exportBtn').style.display='';
   setTimeout(initMap,60); // let the modal lay out first
   listenLocations();
 }
@@ -964,6 +968,12 @@ function listenLocations(){
         markers[uid].bindTooltip((v.name||'Driver')+(uid===myUid?' (you)':'')+(active?' · live':''),
           {permanent:true,direction:'top',offset:[0,-14]});
       });
+      // Draw the active car's recorded trail (breadcrumb)
+      const aTrail=(activeUid&&fresh[activeUid]&&Array.isArray(fresh[activeUid].trail))?fresh[activeUid].trail:null;
+      if(aTrail&&aTrail.length>1){
+        if(trailLine) trailLine.setLatLngs(aTrail);
+        else trailLine=L.polyline(aTrail,{color:'#22C55E',weight:4,opacity:.75,dashArray:'1,7',lineCap:'round'}).addTo(map);
+      }else if(trailLine){map.removeLayer(trailLine);trailLine=null;}
       // Follow the active car (smooth pan, keep zoom)
       if(activeUid && fresh[activeUid]){
         const a=fresh[activeUid];
@@ -997,10 +1007,19 @@ function startSharing(){
   liveModal.querySelector('#geoText').textContent='Locating…';
   const myRef=fbDb.ref('locations/'+currentUser.uid);
   myRef.onDisconnect().remove();
+  // begin a recording session
+  sessionId=Date.now(); myTrack=[];
+  sessionRef=fbDb.ref('tracks/'+currentUser.uid+'/'+sessionId);
+  sessionRef.child('meta').set({name:myName,start:sessionId});
   watchId=navigator.geolocation.watchPosition(pos=>{
     const {latitude:lat,longitude:lng,accuracy:ac}=pos.coords;
-    myRef.set({name:myName,lat,lng,ts:Date.now()});
-    liveModal.querySelector('#geoText').textContent=`Sharing · ${lat.toFixed(5)}, ${lng.toFixed(5)} · ±${Math.round(ac)} m`;
+    const ts=Date.now();
+    myTrack.push({lat,lng,ts});
+    const trail=myTrack.slice(-40).map(p=>[p.lat,p.lng]); // recent trail for the map
+    myRef.set({name:myName,lat,lng,ts,trail});
+    if(sessionRef) sessionRef.child('points').push({lat,lng,ts}); // full recording
+    const eb=liveModal.querySelector('#exportBtn'); if(eb&&myTrack.length>1) eb.style.display='';
+    liveModal.querySelector('#geoText').textContent=`Recording · ${lat.toFixed(5)}, ${lng.toFixed(5)} · ±${Math.round(ac)} m`;
     liveModal.querySelector('#geoDot').classList.add('on');
   },err=>{
     const t={1:'Location permission blocked — allow it in your browser.',2:'Position unavailable right now.',3:'Timed out getting location.'}[err.code]||'Location error.';
@@ -1010,16 +1029,34 @@ function startSharing(){
 function stopSharing(){
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
   if(fbDb&&currentUser){fbDb.ref('locations/'+currentUser.uid).remove();}
+  if(sessionRef){sessionRef.child('meta/end').set(Date.now());sessionRef=null;} // close recording
   const btn=liveModal.querySelector('#liveToggle');
   if(btn){btn.textContent='▶️ Share my live location';btn.classList.remove('stop');}
   const dot=liveModal.querySelector('#geoDot'); if(dot) dot.classList.remove('on');
-  const txt=liveModal.querySelector('#geoText'); if(txt) txt.textContent='Not sharing';
+  const txt=liveModal.querySelector('#geoText'); if(txt) txt.textContent=myTrack.length>1?`Stopped · ${myTrack.length} points recorded`:'Not sharing';
+}
+function exportTrack(){
+  if(myTrack.length<2){return;}
+  const coords=myTrack.map(p=>[p.lng,p.lat]); // GeoJSON is [lng,lat]
+  const geo={type:'FeatureCollection',features:[{
+    type:'Feature',
+    properties:{driver:myName,start:new Date(myTrack[0].ts).toISOString(),
+      end:new Date(myTrack[myTrack.length-1].ts).toISOString(),points:myTrack.length},
+    geometry:{type:'LineString',coordinates:coords}
+  }]};
+  const stamp=new Date(myTrack[0].ts).toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const blob=new Blob([JSON.stringify(geo,null,2)],{type:'application/geo+json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`carpool-drive-${esc(myName)}-${stamp}.geojson`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 function openLive(){ liveOverlay.classList.add('open'); routeLive(); }
 function closeLive(){
   stopSharing();
   if(locRef){locRef.off();locRef=null;}
-  if(map){map.remove();map=null;markers={};}
+  if(map){map.remove();map=null;markers={};trailLine=null;}
   liveOverlay.classList.remove('open');
 }
 document.getElementById('liveBtn').addEventListener('click',openLive);
