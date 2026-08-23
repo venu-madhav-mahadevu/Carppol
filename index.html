@@ -754,26 +754,34 @@ function makePetal(seed){
   p.style.opacity=(0.55+Math.random()*0.4).toFixed(2);
   petalBox.appendChild(p);
 }
-function startPetals(){
-  petalBox.innerHTML='';
-  const n=window.innerWidth<520?14:22;
-  for(let i=0;i<n;i++) makePetal(true);
-}
+// Flower density levels — each click cycles less → more → off
+const PETAL_LEVELS=[
+  {name:'Off',   base:0},
+  {name:'Few',   base:10},
+  {name:'More',  base:22},
+  {name:'Lots',  base:40}
+];
 const petalBtn=document.getElementById('petalBtn');
-function setPetals(on){
-  document.body.classList.toggle('no-petals',!on);
-  petalBtn.textContent=on?'🌸 Flowers':'🌸 Off';
-  if(on&&!petalBox.children.length) startPetals();
-  try{localStorage.setItem('carpool-petals',on?'on':'off');}catch(e){}
+function buildPetals(count){
+  petalBox.innerHTML='';
+  for(let i=0;i<count;i++) makePetal(true);
 }
-let petalPref='on';
-try{petalPref=localStorage.getItem('carpool-petals')||'on';}catch(e){}
+function setPetalLevel(i){
+  const lvl=PETAL_LEVELS[((i%PETAL_LEVELS.length)+PETAL_LEVELS.length)%PETAL_LEVELS.length];
+  const idx=PETAL_LEVELS.indexOf(lvl);
+  const count=window.innerWidth<520?Math.round(lvl.base*0.65):lvl.base;
+  document.body.classList.toggle('no-petals',count===0);
+  buildPetals(count);
+  petalBtn.textContent='🌸 '+lvl.name;
+  try{localStorage.setItem('carpool-petals-lvl',String(idx));}catch(e){}
+  return idx;
+}
+let petalLevel=2; // default: "More" (≈ previous look)
+try{const s=localStorage.getItem('carpool-petals-lvl'); if(s!==null) petalLevel=parseInt(s,10)||0;}catch(e){}
 const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-if(petalPref==='on'&&!reduce) startPetals();
-setPetals(petalPref==='on');
-petalBtn.addEventListener('click',()=>{
-  setPetals(document.body.classList.contains('no-petals'));
-});
+if(reduce) petalLevel=0;
+setPetalLevel(petalLevel);
+petalBtn.addEventListener('click',()=>{ petalLevel=(petalLevel+1)%PETAL_LEVELS.length; setPetalLevel(petalLevel); });
 
 // ---- Side alerts (contextual toasts) ----
 const AC={venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777',
