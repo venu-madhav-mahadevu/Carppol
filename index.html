@@ -279,7 +279,26 @@
   .mbtn.live{background:#22C55E;color:#fff;border-color:transparent;}
   .mbtn.live.stop{background:var(--charan);}
   .mbtn.maps{border-color:var(--shiva);color:var(--shiva);}
-  #liveMap{width:100%;height:100%;background:var(--holiday);}
+  #liveMap,#whereMap{width:100%;height:100%;background:var(--holiday);}
+  .mapwrap.sm{aspect-ratio:auto;height:210px;}
+  .where-status{display:flex;align-items:center;gap:9px;font-size:13px;margin:2px 0 10px;}
+  .where-status .ws-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none;}
+  .where-status .ws-dot.on{background:#22C55E;animation:geoPulse 1.6s infinite;}
+  .where-status b{color:var(--ink);}
+  .where-empty{text-align:center;color:var(--sub);font-size:13px;padding:22px 10px;line-height:1.5;}
+  /* Trip timings log */
+  .logrow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;
+    background:var(--paper);border:1px solid var(--line);margin-bottom:9px;}
+  .logrow .lav{width:34px;height:34px;flex:none;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:700;font-size:14px;font-family:'Fraunces',Georgia,serif;
+    background:var(--lg,#94A3B8);}
+  .logrow .linfo{flex:1;min-width:0;}
+  .logrow .lname{font-weight:700;font-size:13.5px;}
+  .logrow .ltime{font-size:12px;color:var(--sub);margin-top:2px;font-variant-numeric:tabular-nums;}
+  .logrow .ltime b{color:var(--ink);font-weight:600;}
+  .logrow .ldur{flex:none;font-size:12px;font-weight:700;color:var(--shiva);
+    background:var(--holiday);border-radius:20px;padding:4px 10px;white-space:nowrap;}
+  .logrow .ldur.live{color:#fff;background:#22C55E;}
   .leaflet-container{font:inherit;border-radius:0;}
   /* Auth form */
   .fform{display:flex;flex-direction:column;gap:10px;margin:6px 0 4px;}
@@ -381,7 +400,9 @@
     <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
     <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
     <button class="btn" id="contactBtn" type="button">📞 Contacts</button>
+    <button class="btn" id="whereBtn" type="button">🚗 Where?</button>
     <button class="btn" id="liveBtn" type="button">📍 Live</button>
+    <button class="btn" id="logBtn" type="button">🕐 Times</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
@@ -391,6 +412,14 @@
 
   <div class="overlay" id="liveOverlay" role="dialog" aria-modal="true" aria-label="Live location">
     <div class="modal" id="liveModal"></div>
+  </div>
+
+  <div class="overlay" id="whereOverlay" role="dialog" aria-modal="true" aria-label="Where is the car">
+    <div class="modal" id="whereModal"></div>
+  </div>
+
+  <div class="overlay" id="logOverlay" role="dialog" aria-modal="true" aria-label="Carpool timings">
+    <div class="modal" id="logModal"></div>
   </div>
 
   <div class="alerts" id="alerts" aria-live="polite"></div>
@@ -1064,6 +1093,156 @@ function closeLive(){
 document.getElementById('liveBtn').addEventListener('click',openLive);
 liveOverlay.addEventListener('click',e=>{if(e.target===liveOverlay)closeLive();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLive();});
+
+// ---- Quick "Where's the car?" mini map ----
+const whereOverlay=document.getElementById('whereOverlay');
+const whereModal=document.getElementById('whereModal');
+let whereMap=null, whereMarker=null, whereRef=null, whereTrail=null;
+function agoText(ts){
+  if(!ts) return '';
+  const s=Math.max(0,Math.round((Date.now()-ts)/1000));
+  if(s<60) return 'just now';
+  const m=Math.round(s/60); return m===1?'1 min ago':m+' min ago';
+}
+function whereShell(inner){
+  whereModal.innerHTML=`<button class="mclose" id="wcloseBtn" aria-label="Close">×</button>`+
+    `<h2>🚗 Where's the car?</h2>`+inner;
+  whereModal.querySelector('#wcloseBtn').addEventListener('click',closeWhere);
+}
+function openWhere(){
+  whereOverlay.classList.add('open');
+  if(!fbOK){ whereShell(`<div class="where-empty">Live tracking isn’t set up yet.</div>`); return; }
+  if(!currentUser){
+    whereShell(`<div class="where-empty">Sign in to see the carpool’s live location.</div>`+
+      `<button class="mbtn live" id="wLogin">🔐 Sign in</button>`);
+    whereModal.querySelector('#wLogin').addEventListener('click',()=>{closeWhere();openLive();});
+    return;
+  }
+  whereShell(
+    `<div class="where-status"><span class="ws-dot" id="wsDot"></span><span id="wsText">Looking for the car…</span></div>`+
+    `<div class="mapwrap sm"><div id="whereMap"></div></div>`+
+    `<a class="mbtn maps" id="wMaps" target="_blank" rel="noopener" style="pointer-events:none;opacity:.4">🗺️ Open in Google Maps</a>`);
+  setTimeout(initWhereMap,60);
+  listenWhere();
+}
+function initWhereMap(){
+  if(!window.L){return;}
+  const el=document.getElementById('whereMap'); if(!el||whereMap) return;
+  whereMap=L.map(el,{zoomControl:true}).setView([37.5485,-121.9886],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom:19,attribution:'© OpenStreetMap'}).addTo(whereMap);
+  setTimeout(()=>whereMap&&whereMap.invalidateSize(),120);
+}
+function listenWhere(){
+  whereRef=fbDb.ref('locations');
+  whereRef.on('value',snap=>{
+    const data=snap.val()||{}, now=Date.now();
+    // pick the most-recent fresh sharer = the active car
+    let best=null;
+    Object.values(data).forEach(v=>{
+      if(!v||typeof v.lat!=='number') return;
+      if(v.ts&&now-v.ts>5*60*1000) return;
+      if(!best||(v.ts||0)>(best.ts||0)) best=v;
+    });
+    const dot=whereModal.querySelector('#wsDot'), txt=whereModal.querySelector('#wsText');
+    const mapsBtn=whereModal.querySelector('#wMaps');
+    if(!best){
+      if(dot) dot.classList.remove('on');
+      if(txt) txt.textContent='No one is sharing right now.';
+      if(whereMarker&&whereMap){whereMap.removeLayer(whereMarker);whereMarker=null;}
+      if(whereTrail&&whereMap){whereMap.removeLayer(whereTrail);whereTrail=null;}
+      if(mapsBtn){mapsBtn.style.pointerEvents='none';mapsBtn.style.opacity='.4';}
+      return;
+    }
+    if(dot) dot.classList.add('on');
+    if(txt) txt.innerHTML=`<b>${esc(best.name||'Driver')}</b> · updated ${agoText(best.ts)}`;
+    if(whereMap){
+      const ll=[best.lat,best.lng];
+      if(whereMarker) whereMarker.setLatLng(ll);
+      else whereMarker=L.marker(ll,{icon:makeMarkerIcon(best.name,true)}).addTo(whereMap);
+      whereMarker.bindTooltip(best.name||'Driver',{permanent:true,direction:'top',offset:[0,-14]});
+      if(Array.isArray(best.trail)&&best.trail.length>1){
+        if(whereTrail) whereTrail.setLatLngs(best.trail);
+        else whereTrail=L.polyline(best.trail,{color:'#22C55E',weight:4,opacity:.75,dashArray:'1,7',lineCap:'round'}).addTo(whereMap);
+      }
+      whereMap.setView(ll,Math.max(whereMap.getZoom(),15),{animate:true});
+    }
+    if(mapsBtn){mapsBtn.href=`https://www.google.com/maps?q=${best.lat},${best.lng}`;
+      mapsBtn.style.pointerEvents='';mapsBtn.style.opacity='';}
+  });
+}
+function closeWhere(){
+  if(whereRef){whereRef.off();whereRef=null;}
+  if(whereMap){whereMap.remove();whereMap=null;whereMarker=null;whereTrail=null;}
+  whereOverlay.classList.remove('open');
+}
+document.getElementById('whereBtn').addEventListener('click',openWhere);
+whereOverlay.addEventListener('click',e=>{if(e.target===whereOverlay)closeWhere();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWhere();});
+
+// ---- Carpool timings log (start/end by date) ----
+const logOverlay=document.getElementById('logOverlay');
+const logModal=document.getElementById('logModal');
+function localDateStr(ts){const d=new Date(ts);return `${d.getFullYear()}-${pad0(d.getMonth()+1)}-${pad0(d.getDate())}`;}
+function hhmm(ts){return new Date(ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function durText(ms){
+  const m=Math.round(ms/60000);
+  if(m<1) return '<1 min';
+  if(m<60) return m+' min';
+  const h=Math.floor(m/60), r=m%60; return r?`${h}h ${r}m`:`${h}h`;
+}
+function logShell(inner){
+  logModal.innerHTML=`<button class="mclose" id="lgcloseBtn" aria-label="Close">×</button>`+
+    `<h2>🕐 Carpool Timings</h2>`+inner;
+  logModal.querySelector('#lgcloseBtn').addEventListener('click',closeLog);
+}
+function openLog(){
+  logOverlay.classList.add('open');
+  if(!fbOK){ logShell(`<div class="where-empty">Live tracking isn’t set up yet.</div>`); return; }
+  if(!currentUser){
+    logShell(`<div class="where-empty">Sign in to view recorded carpool timings.</div>`+
+      `<button class="mbtn live" id="lgLogin">🔐 Sign in</button>`);
+    logModal.querySelector('#lgLogin').addEventListener('click',()=>{closeLog();openLive();});
+    return;
+  }
+  const today=localDateStr(Date.now());
+  logShell(
+    `<div class="msub">Start &amp; end times of every recorded drive on a day.</div>`+
+    `<input class="finput" type="date" id="logDate" value="${today}" max="${today}" style="margin-bottom:12px">`+
+    `<div id="logList"><div class="where-empty">Loading…</div></div>`);
+  logModal.querySelector('#logDate').addEventListener('change',e=>renderLog(e.target.value));
+  renderLog(today);
+}
+function renderLog(dateStr){
+  const list=logModal.querySelector('#logList');
+  if(list) list.innerHTML=`<div class="where-empty">Loading…</div>`;
+  fbDb.ref('tracks').once('value').then(snap=>{
+    const data=snap.val()||{}, rows=[];
+    Object.values(data).forEach(sessions=>{
+      Object.values(sessions||{}).forEach(sess=>{
+        const meta=sess&&sess.meta; if(!meta||!meta.start) return;
+        if(localDateStr(meta.start)!==dateStr) return;
+        rows.push({name:meta.name||'Driver',start:meta.start,end:meta.end||null});
+      });
+    });
+    rows.sort((a,b)=>a.start-b.start);
+    if(!list) return;
+    if(!rows.length){list.innerHTML=`<div class="where-empty">No carpool trips recorded on this day.</div>`;return;}
+    list.innerHTML=rows.map(r=>{
+      const cls=PCLASS[r.name]||''; const grad=cls?({venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777'}[cls]):'#94A3B8';
+      const live=!r.end;
+      const dur=live?'● live':durText(r.end-r.start);
+      return `<div class="logrow"><div class="lav" style="--lg:${grad}">${esc((r.name[0]||'?'))}</div>`+
+        `<div class="linfo"><div class="lname">${esc(r.name)}</div>`+
+        `<div class="ltime">🟢 <b>${hhmm(r.start)}</b> → ${live?'in progress':('🔴 <b>'+hhmm(r.end)+'</b>')}</div></div>`+
+        `<div class="ldur${live?' live':''}">${dur}</div></div>`;
+    }).join('');
+  }).catch(err=>{ if(list) list.innerHTML=`<div class="where-empty">Couldn’t load timings.<br>${esc(err.message||'')}</div>`; });
+}
+function closeLog(){ logOverlay.classList.remove('open'); }
+document.getElementById('logBtn').addEventListener('click',openLog);
+logOverlay.addEventListener('click',e=>{if(e.target===logOverlay)closeLog();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLog();});
 </script>
 </body>
 </html>
