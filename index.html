@@ -283,6 +283,12 @@
   .mbtn.live{background:#22C55E;color:#fff;border-color:transparent;}
   .mbtn.live.stop{background:var(--charan);}
   .mbtn.maps{border-color:var(--shiva);color:var(--shiva);}
+  .autorow{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;
+    margin:12px 0 7px;cursor:pointer;user-select:none;}
+  .autorow input{width:17px;height:17px;accent-color:#22C55E;cursor:pointer;flex:none;}
+  .autoinfo{font-size:11.5px;color:var(--sub);line-height:1.55;background:var(--holiday);
+    border-radius:11px;padding:9px 11px;margin-bottom:2px;}
+  .autoinfo b{color:var(--ink);font-weight:600;}
   #liveMap,#whereMap{width:100%;height:100%;background:var(--holiday);}
   .mapwrap.sm{aspect-ratio:auto;height:210px;}
   .where-status{display:flex;align-items:center;gap:9px;font-size:13px;margin:2px 0 10px;}
@@ -491,6 +497,14 @@ const CONTACTS = {
 // Paste your WhatsApp group invite link here (https://chat.whatsapp.com/....) or leave '' :
 const GROUP_WHATSAPP = '';
 const SCHOOL_URL = 'https://fremontunified.org/thornton/';
+
+/* ===== EDIT HERE: auto-record windows (24-hour HH:MM). On minimum days the
+   afternoon automatically uses minDayAfternoon instead of afternoon. */
+const RECORD_WINDOWS = {
+  morning:         { start:'07:20', end:'08:30', label:'Morning' },
+  afternoon:       { start:'13:40', end:'15:00', label:'Afternoon' },
+  minDayAfternoon: { start:'12:00', end:'13:00', label:'Afternoon (minimum day)' }
+};
 
 /* ===== EDIT HERE: paste your Firebase project config (Console → Project settings → Web app)
    These values are safe to be public. Live tracking stays disabled until apiKey is filled. */
@@ -953,15 +967,29 @@ function liveTrackScreen(){
     `<div class="geo-line"><span class="geo-dot" id="geoDot"></span><span id="geoText">Not sharing yet</span></div>`+
     `<button class="mbtn live" id="liveToggle">▶️ Share my live location</button>`+
     `<button class="mbtn maps" id="exportBtn" style="display:none">⬇️ Save this drive (GeoJSON)</button>`+
+    `<label class="autorow"><input type="checkbox" id="autoChk"> <span>Auto-record during carpool times</span></label>`+
+    `<div class="autoinfo" id="autoInfo"></div>`+
     `<div class="roster" id="roster"></div>`+
-    `<div class="mnote">Your route is recorded while sharing — the trail shows on the map and each drive can be saved to your Drive. Sharing streams to every signed-in driver; turn it off (or close) to stop.</div>`;
+    `<div class="mnote">Auto-record only runs while this screen is open (a browser can’t track GPS in the background). Your route streams to every signed-in driver while recording.</div>`;
   liveModal.querySelector('#lcloseBtn').addEventListener('click',closeLive);
   liveModal.querySelector('#fSignout').addEventListener('click',()=>{stopSharing();fbAuth.signOut();});
   liveModal.querySelector('#liveToggle').addEventListener('click',toggleShare);
   liveModal.querySelector('#exportBtn').addEventListener('click',exportTrack);
   if(myTrack.length>1) liveModal.querySelector('#exportBtn').style.display='';
+  // auto-record toggle
+  const autoChk=liveModal.querySelector('#autoChk');
+  let autoPref=true; try{autoPref=localStorage.getItem('carpool-auto')!=='off';}catch(e){}
+  autoChk.checked=autoPref;
+  autoChk.addEventListener('change',()=>{
+    try{localStorage.setItem('carpool-auto',autoChk.checked?'on':'off');}catch(e){}
+    if(!autoChk.checked&&autoShare){autoShare=false;stopSharing();}
+    autoTick();
+  });
   setTimeout(initMap,60); // let the modal lay out first
   listenLocations();
+  autoTick();
+  if(autoTimer) clearInterval(autoTimer);
+  autoTimer=setInterval(autoTick,20000);
 }
 function makeMarkerIcon(name,active){
   const initial=esc(((name||'?').trim()[0]||'?').toUpperCase());
@@ -1039,7 +1067,51 @@ function listenLocations(){
     }
   });
 }
-function toggleShare(){ watchId===null?startSharing():stopSharing(); }
+function toggleShare(){
+  if(watchId===null){ autoShare=false; autoSuppressKey=null; startSharing(); }
+  else { const w=currentWindow(new Date()); autoSuppressKey=w?w.key:null; autoShare=false; stopSharing(); }
+}
+
+// ---- Auto-record windows ----
+let autoTimer=null, autoShare=false, autoSuppressKey=null;
+function toMin(hhmm){const [h,m]=hhmm.split(':').map(Number);return h*60+m;}
+function fmt12(hhmm){const [h,m]=hhmm.split(':').map(Number);const ap=h<12?'AM':'PM';const hh=((h+11)%12)+1;return `${hh}:${String(m).padStart(2,'0')} ${ap}`;}
+function isMinDayToday(){return typeof EARLY!=='undefined'&&EARLY.has(TODAY);}
+function todayAfternoon(){return isMinDayToday()?RECORD_WINDOWS.minDayAfternoon:RECORD_WINDOWS.afternoon;}
+function currentWindow(now){
+  const mins=now.getHours()*60+now.getMinutes();
+  const M=RECORD_WINDOWS.morning;
+  if(mins>=toMin(M.start)&&mins<toMin(M.end)) return {key:'morning',...M};
+  const A=todayAfternoon();
+  if(mins>=toMin(A.start)&&mins<toMin(A.end)) return {key:'afternoon',...A};
+  return null;
+}
+function autoTick(){
+  if(!liveOverlay.classList.contains('open')||!currentUser) return;
+  const autoChk=liveModal.querySelector('#autoChk');
+  const autoOn=autoChk?autoChk.checked:false;
+  const w=currentWindow(new Date());
+  updateAutoInfo(w,autoOn);
+  if(!autoOn) return;
+  if(w){
+    if(autoSuppressKey===w.key) return;         // user manually stopped this window
+    if(watchId===null){ autoShare=true; startSharing(); }
+  }else{
+    autoSuppressKey=null;
+    if(watchId!==null&&autoShare){ autoShare=false; stopSharing(); }
+  }
+}
+function updateAutoInfo(w,autoOn){
+  const el=liveModal.querySelector('#autoInfo'); if(!el) return;
+  const M=RECORD_WINDOWS.morning, A=todayAfternoon();
+  const sched=`Today: <b>${fmt12(M.start)}–${fmt12(M.end)}</b> · <b>${fmt12(A.start)}–${fmt12(A.end)}</b>`+
+    (isMinDayToday()?` <span style="color:#F59E0B;font-weight:700">(minimum day)</span>`:``);
+  let status;
+  if(!autoOn) status='Auto-record is <b>off</b> — sharing is manual.';
+  else if(w) status=`🟢 In the <b>${esc(w.label)}</b> window — recording automatically.`;
+  else status='Waiting — will start automatically at the next window.';
+  el.innerHTML=status+'<br>'+sched;
+}
 function startSharing(){
   if(!('geolocation' in navigator)){liveModal.querySelector('#geoText').textContent='⚠️ Geolocation not supported.';return;}
   const btn=liveModal.querySelector('#liveToggle');
@@ -1094,6 +1166,8 @@ function exportTrack(){
 }
 function openLive(){ liveOverlay.classList.add('open'); routeLive(); }
 function closeLive(){
+  if(autoTimer){clearInterval(autoTimer);autoTimer=null;}
+  autoShare=false;
   stopSharing();
   if(locRef){locRef.off();locRef=null;}
   if(map){map.remove();map=null;markers={};trailLine=null;}
