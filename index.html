@@ -147,6 +147,17 @@
     transition:border-color .15s,box-shadow .2s,transform .12s,background .15s;}
   .btn:hover{border-color:var(--venu);box-shadow:0 4px 12px -5px rgba(79,70,229,.5);transform:translateY(-1px);}
   .btn:active{transform:scale(.96);}
+  .authbadge{display:inline-flex;align-items:center;gap:7px;margin-right:auto;font:inherit;
+    font-size:12.5px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);
+    border-radius:20px;padding:6px 13px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);
+    max-width:150px;transition:border-color .15s,box-shadow .2s,transform .12s;}
+  .authbadge:hover{border-color:var(--venu);transform:translateY(-1px);
+    box-shadow:0 4px 12px -5px rgba(79,70,229,.5);}
+  .authbadge .ab-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none;}
+  .authbadge #abText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .authbadge.in{border-color:#22C55E;}
+  .authbadge.in .ab-dot{background:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.2);
+    animation:geoPulse 1.8s infinite;}
 
   /* Today banner */
   .banner{position:relative;overflow:hidden;background:var(--glass);
@@ -427,6 +438,7 @@
   </header>
 
   <div class="toolbar">
+    <button class="authbadge" id="authBadge" type="button"><span class="ab-dot"></span><span id="abText">Log in</span></button>
     <button class="btn" id="todayBtn" type="button">📍 Today</button>
     <button class="btn" id="printBtn" type="button">🖨️ Print</button>
     <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
@@ -901,6 +913,7 @@ let myTrack=[], sessionId=null, trailLine=null, sessionRef=null;
       fbAuth=firebase.auth(); fbDb=firebase.database(); fbOK=true;
       fbAuth.onAuthStateChanged(u=>{
         currentUser=u;
+        updateAuthBadge();
         if(liveOverlay.classList.contains('open')) routeLive();
       });
     }
@@ -1195,6 +1208,21 @@ function closeLive(){
 document.getElementById('liveBtn').addEventListener('click',openLive);
 liveOverlay.addEventListener('click',e=>{if(e.target===liveOverlay)closeLive();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLive();});
+
+// ---- Login status badge ----
+function updateAuthBadge(){
+  const b=document.getElementById('authBadge'), t=document.getElementById('abText');
+  if(!b||!t) return;
+  if(currentUser){
+    const nm=currentUser.displayName||(currentUser.email||'Driver').split('@')[0];
+    b.classList.add('in'); t.textContent=nm; b.title='Signed in — tap for the live map';
+  }else{
+    b.classList.remove('in'); t.textContent='Log in';
+    b.title=fbOK?'Tap to log in':'Live tracking not set up yet';
+  }
+}
+document.getElementById('authBadge').addEventListener('click',openLive);
+updateAuthBadge();
 
 // ---- Quick "Where's the car?" mini map ----
 const whereOverlay=document.getElementById('whereOverlay');
