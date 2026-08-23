@@ -314,6 +314,23 @@
     box-shadow:0 6px 14px -7px rgba(16,24,40,.35);}
   .logrow .lchev{font-size:10.5px;font-weight:600;color:var(--shiva);margin-left:6px;white-space:nowrap;}
   .cell.school,.cell.holiday{cursor:pointer;}
+  /* Uber-style ride replay */
+  .mapwrap.uber{aspect-ratio:auto;height:56vh;max-height:430px;border-radius:16px;}
+  .uber-head{display:flex;align-items:center;gap:11px;margin:2px 0 10px;}
+  .uber-head .lav{width:38px;height:38px;font-size:15px;}
+  .uber-stats{display:flex;gap:8px;margin:11px 0 2px;}
+  .ustat{flex:1;background:var(--holiday);border-radius:12px;padding:9px 8px;text-align:center;}
+  .ustat .uv{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;}
+  .ustat .ul{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;}
+  .uber-controls{display:flex;align-items:center;gap:12px;margin-top:12px;}
+  .uplay{width:46px;height:46px;border-radius:50%;background:#22C55E;color:#fff;border:none;
+    font-size:17px;cursor:pointer;flex:none;box-shadow:0 6px 16px -6px rgba(34,197,94,.7);
+    display:flex;align-items:center;justify-content:center;transition:transform .12s;}
+  .uplay:active{transform:scale(.93);}
+  .uprog{flex:1;height:7px;border-radius:7px;background:var(--holiday);position:relative;cursor:pointer;}
+  .uprog span{position:absolute;left:0;top:0;bottom:0;background:#22C55E;border-radius:7px;width:0;}
+  .car-puck{font-size:22px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45));
+    transform-origin:center;will-change:transform;}
   .leaflet-container{font:inherit;border-radius:0;}
   /* Auth form */
   .fform{display:flex;flex-direction:column;gap:10px;margin:6px 0 4px;}
@@ -1333,32 +1350,102 @@ function renderLog(dateStr){
     });
   }).catch(err=>{ if(list) list.innerHTML=`<div class="where-empty">Couldn’t load timings.<br>${esc(err.message||'')}</div>`; });
 }
+let routeAnim=null;
+function haversine(a,b){const R=6371000,r=x=>x*Math.PI/180;
+  const dLat=r(b[0]-a[0]),dLng=r(b[1]-a[1]);
+  const s=Math.sin(dLat/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));}
+function bearing(a,b){const r=x=>x*Math.PI/180,d=x=>x*180/Math.PI;
+  const y=Math.sin(r(b[1]-a[1]))*Math.cos(r(b[0]));
+  const x=Math.cos(r(a[0]))*Math.sin(r(b[0]))-Math.sin(r(a[0]))*Math.cos(r(b[0]))*Math.cos(r(b[1]-a[1]));
+  return (d(Math.atan2(y,x))+360)%360;}
 function showTrackRoute(r){
   cleanupRouteMap();
   const list=logModal.querySelector('#logList');
   const grad=PGRAD[PCLASS[r.name]]||'#22C55E';
-  list.innerHTML=`<button class="mbtn maps" id="logBack" style="margin:0 0 10px">← Back to ${esc(hhmm(r.start))} trips</button>`+
-    `<div class="where-status"><span class="ws-dot on"></span><span><b>${esc(r.name)}</b> · ${hhmm(r.start)}${r.end?` → ${hhmm(r.end)}`:''}</span></div>`+
-    `<div class="mapwrap sm"><div id="logRouteMap"></div></div>`+
+  list.innerHTML=`<button class="mbtn maps" id="logBack" style="margin:0 0 10px">← Back to trips</button>`+
+    `<div class="uber-head"><div class="lav" style="--lg:${grad}">${esc(r.name[0]||'?')}</div>`+
+      `<div class="linfo"><div class="lname">${esc(r.name)}</div>`+
+      `<div class="ltime">🟢 <b>${hhmm(r.start)}</b>${r.end?` → 🔴 <b>${hhmm(r.end)}</b>`:''}</div></div></div>`+
+    `<div class="mapwrap uber"><div id="logRouteMap"></div></div>`+
+    `<div class="uber-stats" id="uStats"></div>`+
+    `<div class="uber-controls"><button class="uplay" id="uPlay" aria-label="Play">▶️</button>`+
+      `<div class="uprog" id="uProg"><span></span></div></div>`+
     `<div id="routeMsg" class="ltime" style="text-align:center;margin-top:8px">Loading route…</div>`;
   list.querySelector('#logBack').addEventListener('click',()=>renderLog(logDateSel));
   fbDb.ref('tracks/'+r.uid+'/'+r.sid+'/points').once('value').then(snap=>{
-    const pts=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&typeof v.lat==='number') pts.push([v.lat,v.lng]);});
+    const pts=[],tss=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&typeof v.lat==='number'){pts.push([v.lat,v.lng]);tss.push(v.ts||0);}});
     const msg=logModal.querySelector('#routeMsg');
     if(!window.L){ if(msg) msg.textContent='Map library not loaded.'; return; }
     const el=document.getElementById('logRouteMap'); if(!el) return;
-    logRouteMap=L.map(el,{zoomControl:true}).setView([37.5485,-121.9886],12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(logRouteMap);
+    const dark=document.documentElement.getAttribute('data-theme')==='dark';
+    const tileURL=dark?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    logRouteMap=L.map(el,{zoomControl:true,attributionControl:false}).setView([37.5485,-121.9886],13);
+    L.tileLayer(tileURL,{maxZoom:20,subdomains:'abcd'}).addTo(logRouteMap);
     setTimeout(()=>logRouteMap&&logRouteMap.invalidateSize(),120);
-    if(pts.length<1){ if(msg) msg.textContent='No route points saved for this trip.'; return; }
-    L.polyline(pts,{color:grad,weight:5,opacity:.85,lineCap:'round'}).addTo(logRouteMap);
-    L.circleMarker(pts[0],{radius:6,color:'#fff',weight:2,fillColor:'#22C55E',fillOpacity:1}).addTo(logRouteMap).bindTooltip('Start',{permanent:false});
-    L.circleMarker(pts[pts.length-1],{radius:6,color:'#fff',weight:2,fillColor:'#EF4444',fillOpacity:1}).addTo(logRouteMap).bindTooltip('End',{permanent:false});
-    logRouteMap.fitBounds(pts,{padding:[25,25],maxZoom:16});
-    if(msg) msg.textContent=`${pts.length} points recorded`;
+    if(pts.length<2){ logRouteMap.setView(pts[0]||[37.5485,-121.9886],15); if(msg) msg.textContent='Not enough route points to replay.'; return; }
+    // cumulative distance
+    let cum=[0],total=0; for(let i=1;i<pts.length;i++){total+=haversine(pts[i-1],pts[i]);cum.push(total);}
+    logRouteMap.fitBounds(pts,{padding:[30,30],maxZoom:16});
+    L.polyline(pts,{color:grad,weight:5,opacity:.28,lineCap:'round'}).addTo(logRouteMap);        // full faint route
+    const travel=L.polyline([pts[0]],{color:grad,weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(logRouteMap); // traveled
+    L.circleMarker(pts[0],{radius:6,color:'#fff',weight:2,fillColor:'#22C55E',fillOpacity:1}).addTo(logRouteMap);
+    L.circleMarker(pts[pts.length-1],{radius:6,color:'#fff',weight:2,fillColor:'#EF4444',fillOpacity:1}).addTo(logRouteMap);
+    const carIcon=L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],html:`<div class="car-puck">🚗</div>`});
+    const car=L.marker(pts[0],{icon:carIcon,zIndexOffset:1000}).addTo(logRouteMap);
+    // stats
+    const durMs=(r.end||tss[tss.length-1])-r.start;
+    const mi=(total/1000)*0.621371;
+    const mph=durMs>0?(mi/(durMs/3600000)):0;
+    logModal.querySelector('#uStats').innerHTML=
+      `<div class="ustat"><div class="uv">${mi<10?mi.toFixed(2):mi.toFixed(1)} mi</div><div class="ul">Distance</div></div>`+
+      `<div class="ustat"><div class="uv">${durText(durMs)}</div><div class="ul">Duration</div></div>`+
+      `<div class="ustat"><div class="uv">${mph?mph.toFixed(0):'—'}</div><div class="ul">Avg mph</div></div>`;
+    if(msg) msg.textContent=`${pts.length} points · tap ▶ to replay`;
+    // playback engine
+    const playBtn=logModal.querySelector('#uPlay'), progBar=logModal.querySelector('#uProg span');
+    const playMs=Math.min(22000,Math.max(8000,pts.length*130));
+    let p=0,playing=false,last=0;
+    function posAt(prog){
+      const d=prog*total; let i=1; while(i<cum.length&&cum[i]<d) i++;
+      if(i>=pts.length) return {ll:pts[pts.length-1],idx:pts.length-1};
+      const seg=(cum[i]-cum[i-1])||1, f=(d-cum[i-1])/seg;
+      const ll=[pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f];
+      return {ll,idx:i-1,i,f};
+    }
+    function draw(prog){
+      const s=posAt(prog);
+      car.setLatLng(s.ll);
+      const el2=car.getElement()&&car.getElement().querySelector('.car-puck');
+      if(el2&&s.i){ const b=bearing(pts[s.idx],pts[s.i]); el2.style.transform=`rotate(${b-90}deg)`; }
+      const seg=pts.slice(0,s.idx+1); seg.push(s.ll); travel.setLatLngs(seg);
+      logRouteMap.panTo(s.ll,{animate:true,duration:.25});
+      if(progBar) progBar.style.width=(prog*100)+'%';
+    }
+    function frame(t){
+      if(!playing) return;
+      if(!last) last=t; const dt=t-last; last=t;
+      p+=dt/playMs;
+      if(p>=1){ p=1; draw(1); stopPlay(); playBtn.textContent='↺'; playBtn.setAttribute('aria-label','Replay'); return; }
+      draw(p); routeAnim=requestAnimationFrame(frame);
+    }
+    function play(){ if(p>=1) p=0; playing=true; last=0; playBtn.textContent='⏸️'; routeAnim=requestAnimationFrame(frame); }
+    function stopPlay(){ playing=false; if(routeAnim){cancelAnimationFrame(routeAnim);routeAnim=null;} }
+    playBtn.addEventListener('click',()=>{ if(playing){stopPlay();playBtn.textContent='▶️';} else play(); });
+    logModal.querySelector('#uProg').addEventListener('click',e=>{
+      const rect=e.currentTarget.getBoundingClientRect();
+      p=Math.min(1,Math.max(0,(e.clientX-rect.left)/rect.width)); draw(p);
+      playBtn.textContent=p>=1?'↺':'▶️';
+    });
+    draw(0);
+    play(); // auto-start the replay for the Uber feel
   }).catch(err=>{const msg=logModal.querySelector('#routeMsg'); if(msg) msg.textContent='Couldn’t load route: '+(err.message||'');});
 }
-function cleanupRouteMap(){ if(logRouteMap){logRouteMap.remove();logRouteMap=null;} }
+function cleanupRouteMap(){
+  if(routeAnim){cancelAnimationFrame(routeAnim);routeAnim=null;}
+  if(logRouteMap){logRouteMap.remove();logRouteMap=null;}
+}
 function closeLog(){ cleanupRouteMap(); logOverlay.classList.remove('open'); }
 document.getElementById('logBtn').addEventListener('click',()=>openLog());
 logOverlay.addEventListener('click',e=>{if(e.target===logOverlay)closeLog();});
