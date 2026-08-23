@@ -210,6 +210,36 @@
   .rider .rwith b{color:var(--rc);font-weight:700;}
   @media (max-width:400px){.rider-grid{grid-template-columns:1fr;}}
 
+  /* Side alerts (toasts) */
+  .alerts{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;
+    gap:10px;width:300px;max-width:calc(100vw - 28px);pointer-events:none;}
+  .alert{pointer-events:auto;position:relative;display:flex;gap:11px;align-items:flex-start;
+    padding:12px 34px 12px 13px;border-radius:14px;overflow:hidden;
+    background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(160%);
+    backdrop-filter:blur(18px) saturate(160%);border:1px solid var(--glass-brd);
+    box-shadow:0 16px 40px -16px rgba(16,24,40,.4);
+    transform:translateX(120%);opacity:0;animation:alertIn .5s cubic-bezier(.2,.9,.3,1) forwards;}
+  .alert.out{animation:alertOut .35s ease forwards;}
+  @keyframes alertIn{to{transform:translateX(0);opacity:1;}}
+  @keyframes alertOut{to{transform:translateX(120%);opacity:0;}}
+  .alert::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ac,#4F46E5);}
+  .alert .aicon{width:30px;height:30px;flex:none;border-radius:9px;display:flex;align-items:center;
+    justify-content:center;font-size:15px;background:var(--ac,#4F46E5);
+    box-shadow:0 4px 10px -4px var(--ac,#4F46E5);color:#fff;}
+  .alert .abody{min-width:0;}
+  .alert .atitle{font-size:13px;font-weight:700;line-height:1.2;color:var(--ink);}
+  .alert .atext{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.35;}
+  .alert .aclose{position:absolute;top:7px;right:8px;width:20px;height:20px;border:none;
+    background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;
+    border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;}
+  .alert .aclose:hover{background:var(--holiday);color:var(--ink);}
+  .alert .abar{position:absolute;left:0;bottom:0;height:2.5px;width:100%;background:var(--ac,#4F46E5);
+    transform-origin:left;opacity:.5;animation:alertBar var(--life,9s) linear forwards;}
+  .alert:hover .abar{animation-play-state:paused;}
+  @keyframes alertBar{to{transform:scaleX(0);}}
+  @media (max-width:520px){.alerts{left:14px;right:14px;width:auto;}}
+  @media print{.alerts{display:none;}}
+
   /* Falling flowers */
   .petals{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:9999;}
   .petal{position:absolute;top:-8%;will-change:transform,opacity;
@@ -246,9 +276,11 @@
     <button class="btn" id="todayBtn" type="button">📍 Today</button>
     <button class="btn" id="printBtn" type="button">🖨️ Print</button>
     <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
+    <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
+  <div class="alerts" id="alerts" aria-live="polite"></div>
   <div class="petals" id="petals" aria-hidden="true"></div>
 
   <div id="banner" class="banner" hidden></div>
@@ -523,6 +555,85 @@ setPetals(petalPref==='on');
 petalBtn.addEventListener('click',()=>{
   setPetals(document.body.classList.contains('no-petals'));
 });
+
+// ---- Side alerts (contextual toasts) ----
+const AC={venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777',
+  amber:'#F59E0B',info:'#4F46E5',ok:'#0D9488'};
+const alertsBox=document.getElementById('alerts');
+function fmtDay(dateStr){
+  const d=new Date(...dateStr.split('-').map((v,i)=>i===1?v-1:+v));
+  return d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+}
+function relDay(dateStr){
+  if(dateStr===TODAY) return 'today';
+  if(dateStr===addDays(TODAY,1)) return 'tomorrow';
+  const d=new Date(...dateStr.split('-').map((v,i)=>i===1?v-1:+v));
+  return 'on '+d.toLocaleDateString('en-US',{weekday:'long'});
+}
+function collectAlerts(){
+  const list=[];
+  // 1) Today's driver (or next up)
+  const td=(TODAY>=FIRST&&TODAY<=LAST)?driverForDate(TODAY):null;
+  if(td){
+    const early=EARLY.has(TODAY);
+    list.push({icon:'🚗',color:AC[PCLASS[td]],
+      title:`${td} drives today`,
+      text:early?'Leave 7:30 AM · early pickup 12:45 PM':'Leave 7:30 AM · pickup 2:00 PM'});
+  }else{
+    let scan=TODAY<FIRST?FIRST:addDays(TODAY,1),nd=null;
+    for(let i=0;i<200&&scan<=LAST;i++){if(driverForDate(scan)){nd=scan;break;}scan=addDays(scan,1);}
+    if(nd) list.push({icon:'📅',color:AC.info,title:'No school today',
+      text:`Next up: ${driverForDate(nd)} · ${fmtDay(nd)}`});
+  }
+  // 2) Upcoming minimum day within 8 days (incl. today if not already the driver note)
+  let mScan=TODAY;
+  for(let i=0;i<9;i++){
+    if(mScan>LAST) break;
+    if(EARLY.has(mScan)&&driverForDate(mScan)&&!(mScan===TODAY)){
+      list.push({icon:'⏰',color:AC.amber,title:`Minimum day ${relDay(mScan)}`,
+        text:`Early pickup 12:45 PM · ${fmtDay(mScan)}`});
+      break;
+    }
+    mScan=addDays(mScan,1);
+  }
+  // 3) Upcoming no-school (holiday) within 10 days, excluding weekends
+  let hScan=addDays(TODAY,1);
+  for(let i=0;i<10;i++){
+    if(hScan>LAST) break;
+    const wd=new Date(...hScan.split('-').map((v,x)=>x===1?v-1:+v)).getDay();
+    if(wd!==0&&wd!==6&&NO_SCHOOL[hScan]){
+      list.push({icon:'🏖️',color:AC.ok,title:`No school ${relDay(hScan)}`,
+        text:`${NO_SCHOOL[hScan]} · ${fmtDay(hScan)}`});
+      break;
+    }
+    hScan=addDays(hScan,1);
+  }
+  return list.slice(0,4);
+}
+function showAlert(a,delay){
+  const el=document.createElement('div');
+  el.className='alert';
+  el.style.setProperty('--ac',a.color);
+  el.style.animationDelay=delay+'s';
+  el.innerHTML=`<div class="aicon">${a.icon}</div>`+
+    `<div class="abody"><div class="atitle">${a.title}</div><div class="atext">${a.text}</div></div>`+
+    `<button class="aclose" aria-label="Dismiss">×</button>`+
+    `<div class="abar" style="--life:9s;animation-delay:${delay}s"></div>`;
+  const close=()=>{el.classList.add('out');setTimeout(()=>el.remove(),350);};
+  el.querySelector('.aclose').addEventListener('click',close);
+  let timer=setTimeout(close,(9+delay)*1000);
+  el.addEventListener('mouseenter',()=>clearTimeout(timer));
+  el.addEventListener('mouseleave',()=>{timer=setTimeout(close,4000);});
+  alertsBox.appendChild(el);
+}
+function runAlerts(){
+  alertsBox.innerHTML='';
+  const items=collectAlerts();
+  items.forEach((a,i)=>showAlert(a,i*0.35));
+}
+document.getElementById('alertBtn').addEventListener('click',runAlerts);
+// auto-show shortly after load
+setTimeout(runAlerts,700);
 </script>
 </body>
 </html>
