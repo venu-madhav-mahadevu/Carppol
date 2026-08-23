@@ -967,10 +967,10 @@ function liveTrackScreen(){
     `<div class="geo-line"><span class="geo-dot" id="geoDot"></span><span id="geoText">Not sharing yet</span></div>`+
     `<button class="mbtn live" id="liveToggle">▶️ Share my live location</button>`+
     `<button class="mbtn maps" id="exportBtn" style="display:none">⬇️ Save this drive (GeoJSON)</button>`+
-    `<label class="autorow"><input type="checkbox" id="autoChk"> <span>Auto-record during carpool times</span></label>`+
+    `<label class="autorow"><input type="checkbox" id="autoChk"> <span>Auto-record when I open Live</span></label>`+
     `<div class="autoinfo" id="autoInfo"></div>`+
     `<div class="roster" id="roster"></div>`+
-    `<div class="mnote">Auto-record only runs while this screen is open (a browser can’t track GPS in the background). Your route streams to every signed-in driver while recording.</div>`;
+    `<div class="mnote">With auto-record on, opening this screen starts recording right away. It only runs while the screen is open (a browser can’t track GPS in the background). Your route streams to every signed-in driver while recording.</div>`;
   liveModal.querySelector('#lcloseBtn').addEventListener('click',closeLive);
   liveModal.querySelector('#fSignout').addEventListener('click',()=>{stopSharing();fbAuth.signOut();});
   liveModal.querySelector('#liveToggle').addEventListener('click',toggleShare);
@@ -987,6 +987,8 @@ function liveTrackScreen(){
   });
   setTimeout(initMap,60); // let the modal lay out first
   listenLocations();
+  // Default: opening Live starts recording immediately (manual-intent, so windows won't auto-stop it)
+  if(autoChk.checked && watchId===null){ autoShare=false; autoSuppressKey=null; startSharing(); }
   autoTick();
   if(autoTimer) clearInterval(autoTimer);
   autoTimer=setInterval(autoTick,20000);
@@ -1107,9 +1109,9 @@ function updateAutoInfo(w,autoOn){
   const sched=`Today: <b>${fmt12(M.start)}–${fmt12(M.end)}</b> · <b>${fmt12(A.start)}–${fmt12(A.end)}</b>`+
     (isMinDayToday()?` <span style="color:#F59E0B;font-weight:700">(minimum day)</span>`:``);
   let status;
-  if(!autoOn) status='Auto-record is <b>off</b> — sharing is manual.';
-  else if(w) status=`🟢 In the <b>${esc(w.label)}</b> window — recording automatically.`;
-  else status='Waiting — will start automatically at the next window.';
+  if(!autoOn) status='Auto-record is <b>off</b> — tap ▶️ to record manually.';
+  else if(watchId!==null) status=`🟢 <b>Recording</b>${w?` · in the ${esc(w.label)} window`:''}.`;
+  else status='Recording starts when you open Live.';
   el.innerHTML=status+'<br>'+sched;
 }
 function startSharing(){
