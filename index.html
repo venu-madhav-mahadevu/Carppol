@@ -421,7 +421,16 @@
     transform-origin:left;opacity:.5;animation:alertBar var(--life,9s) linear forwards;}
   .alert:hover .abar{animation-play-state:paused;}
   @keyframes alertBar{to{transform:scaleX(0);}}
-  @media (max-width:520px){.alerts{left:14px;right:14px;width:auto;}}
+  @media (max-width:520px){
+    /* dock to the bottom on phones so it never covers the calendar */
+    .alerts{top:auto;bottom:12px;left:10px;right:10px;width:auto;}
+    .alert{padding:9px 30px 9px 10px;border-radius:13px;}
+    .alert .aicon{width:26px;height:26px;font-size:13px;border-radius:8px;}
+    .alert .adate{padding:3px 8px;margin-bottom:4px;}
+    .alert .adate .ad{font-size:12.5px;}
+    .alert .atitle{font-size:12.5px;}
+    .alert .adots{margin-top:6px;}
+  }
   @media print{.alerts{display:none;}}
 
   /* Falling flowers */
