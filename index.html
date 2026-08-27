@@ -493,6 +493,25 @@
   .sbar span{display:block;height:100%;border-radius:7px;transition:width .8s cubic-bezier(.2,.7,.3,1);}
   .sbar-count{width:64px;flex:none;text-align:right;color:var(--sub);font-weight:700;font-size:12px;}
   .stat-note{font-size:12px;color:var(--sub);margin:6px 0 14px;line-height:1.5;}
+  /* Group chat */
+  .chat-list{height:52vh;min-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:9px;
+    padding:6px 2px 8px;margin-bottom:10px;}
+  .msg{max-width:82%;display:flex;flex-direction:column;gap:2px;}
+  .msg.mine{align-self:flex-end;align-items:flex-end;}
+  .msg .m-meta{font-size:10px;color:var(--muted);font-weight:600;padding:0 4px;}
+  .msg .m-bubble{padding:8px 12px;border-radius:15px;font-size:13.5px;line-height:1.35;
+    background:var(--paper);border:1px solid var(--line);color:var(--ink);word-wrap:break-word;}
+  .msg.mine .m-bubble{background:var(--venu);border-color:transparent;color:#fff;border-bottom-right-radius:5px;}
+  .msg:not(.mine) .m-bubble{border-bottom-left-radius:5px;}
+  .msg .m-name{color:var(--mc,var(--venu));}
+  .chat-input{display:flex;gap:8px;}
+  .chat-input input{flex:1;font:inherit;font-size:14px;padding:11px 14px;border-radius:22px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);}
+  .chat-input input:focus{outline:none;border-color:var(--venu);box-shadow:0 0 0 3px rgba(79,70,229,.15);}
+  .chat-input button{flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;
+    background:var(--venu);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;}
+  .chat-empty{margin:auto;text-align:center;color:var(--sub);font-size:13px;padding:20px;}
+
   /* Countdown chip */
   .countchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
     background:var(--card);border:1px solid var(--line);border-radius:20px;padding:5px 12px;
@@ -548,6 +567,7 @@
     <button class="btn" id="logBtn" type="button">🕐 Times</button>
     <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
     <button class="btn" id="statsBtn" type="button">📊 Stats</button>
+    <button class="btn" id="chatBtn" type="button">💬 Chat</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
@@ -569,6 +589,10 @@
 
   <div class="overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-label="Driving stats">
     <div class="modal" id="statsModal"></div>
+  </div>
+
+  <div class="overlay" id="chatOverlay" role="dialog" aria-modal="true" aria-label="Group chat">
+    <div class="modal" id="chatModal"></div>
   </div>
 
   <div class="overlay" id="logOverlay" role="dialog" aria-modal="true" aria-label="Carpool timings">
@@ -1809,6 +1833,64 @@ function closeSwaps(){ if(swapsRef){swapsRef.off();swapsRef=null;} swapOverlay.c
 document.getElementById('swapBtn').addEventListener('click',openSwaps);
 swapOverlay.addEventListener('click',e=>{if(e.target===swapOverlay)closeSwaps();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
+
+// ---- Group Messenger ----
+const chatOverlay=document.getElementById('chatOverlay');
+const chatModal=document.getElementById('chatModal');
+let msgsRef=null;
+function chatMyName(){ return (currentUser.displayName)||(currentUser.email||'Driver').split('@')[0]; }
+function openChat(){
+  chatOverlay.classList.add('open');
+  if(!fbOK){ chatModal.innerHTML=`<button class="mclose" id="chcloseBtn">×</button><h2>💬 Carpool Chat</h2><div class="chat-empty">Set up Firebase to use chat.</div>`;
+    chatModal.querySelector('#chcloseBtn').addEventListener('click',closeChat); return; }
+  if(!currentUser){
+    chatModal.innerHTML=`<button class="mclose" id="chcloseBtn">×</button><h2>💬 Carpool Chat</h2>`+
+      `<div class="chat-empty">Sign in to chat with the carpool group.</div>`+
+      `<button class="mbtn live" id="chLogin">🔐 Sign in</button>`;
+    chatModal.querySelector('#chcloseBtn').addEventListener('click',closeChat);
+    chatModal.querySelector('#chLogin').addEventListener('click',()=>{closeChat();openLive();});
+    return;
+  }
+  chatModal.innerHTML=`<button class="mclose" id="chcloseBtn" aria-label="Close">×</button>`+
+    `<h2>💬 Carpool Chat</h2>`+
+    `<div class="chat-list" id="chatList"><div class="chat-empty">Loading…</div></div>`+
+    `<div class="chat-input"><input id="chatInput" type="text" placeholder="Message the group…" maxlength="500" autocomplete="off">`+
+    `<button id="chatSend" aria-label="Send">➤</button></div>`;
+  chatModal.querySelector('#chcloseBtn').addEventListener('click',closeChat);
+  chatModal.querySelector('#chatSend').addEventListener('click',sendMsg);
+  chatModal.querySelector('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg();});
+  listenMsgs();
+  setTimeout(()=>{const i=chatModal.querySelector('#chatInput');if(i)i.focus();},80);
+}
+function timeShort(ts){ if(!ts)return''; return new Date(ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+function listenMsgs(){
+  msgsRef=fbDb.ref('messages').limitToLast(200);
+  msgsRef.on('value',snap=>{
+    const list=chatModal.querySelector('#chatList'); if(!list) return;
+    const rows=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&v.text) rows.push(v);});
+    if(!rows.length){ list.innerHTML=`<div class="chat-empty">No messages yet — say hi! 👋</div>`; return; }
+    const near=list.scrollHeight-list.scrollTop-list.clientHeight<80;
+    list.innerHTML=rows.map(m=>{
+      const mine=m.by===currentUser.uid;
+      const col=SGRAD[PCLASS[m.byName]]||'var(--venu)';
+      return `<div class="msg${mine?' mine':''}">`+
+        `<div class="m-meta">${mine?'':`<span class="m-name" style="--mc:${col};color:${col}">${esc(m.byName||'Driver')}</span> · `}${timeShort(m.ts)}</div>`+
+        `<div class="m-bubble">${esc(m.text)}</div></div>`;
+    }).join('');
+    if(near||true) list.scrollTop=list.scrollHeight;
+  },err=>{const l=chatModal.querySelector('#chatList');if(l)l.innerHTML=`<div class="chat-empty">Couldn’t load chat.<br>${esc(err.message||'')}</div>`;});
+}
+function sendMsg(){
+  const inp=chatModal.querySelector('#chatInput'); if(!inp) return;
+  const text=inp.value.trim(); if(!text) return;
+  inp.value='';
+  fbDb.ref('messages').push({text,by:currentUser.uid,byName:chatMyName(),ts:Date.now()})
+    .catch(err=>alert('Could not send: '+(err.message||'')));
+}
+function closeChat(){ if(msgsRef){msgsRef.off();msgsRef=null;} chatOverlay.classList.remove('open'); }
+document.getElementById('chatBtn').addEventListener('click',openChat);
+chatOverlay.addEventListener('click',e=>{if(e.target===chatOverlay)closeChat();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeChat();});
 
 // ---- Driving Stats ----
 const statsOverlay=document.getElementById('statsOverlay');
