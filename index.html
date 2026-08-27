@@ -859,10 +859,10 @@ themeBtn.addEventListener('click',()=>{
 const FLOWERS=['🌸','🌼','🌺','🏵️','💮','🌷','🌻'];
 const petalBox=document.getElementById('petals');
 let kidPhotos=[]; // private kid photo URIs — only set when a family member is signed in
-function makePetal(seed){
+function makePetal(seed,forceImg){
   const p=document.createElement('span');
   p.className='petal';
-  const useImg = kidPhotos.length && Math.random()<0.30;
+  const useImg = kidPhotos.length && (forceImg || Math.random()<0.40);
   if(useImg){
     p.classList.add('petal-img');
     p.style.backgroundImage=`url('${kidPhotos[Math.floor(Math.random()*kidPhotos.length)]}')`;
@@ -890,7 +890,8 @@ const PETAL_LEVELS=[
 const petalBtn=document.getElementById('petalBtn');
 function buildPetals(count){
   petalBox.innerHTML='';
-  for(let i=0;i<count;i++) makePetal(true);
+  const forceImg = kidPhotos.length ? Math.min(4,count) : 0; // guarantee some face-petals
+  for(let i=0;i<count;i++) makePetal(true, i<forceImg);
 }
 function setPetalLevel(i){
   const lvl=PETAL_LEVELS[((i%PETAL_LEVELS.length)+PETAL_LEVELS.length)%PETAL_LEVELS.length];
