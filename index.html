@@ -138,11 +138,13 @@
     letter-spacing:.06em;color:rgba(255,255,255,.85);}
   footer{margin-top:6px;font-size:12px;color:var(--muted);text-align:center;line-height:1.6;}
   footer b{color:var(--sub);font-weight:600;}
-  .visitcount{margin-top:11px;display:inline-flex;gap:7px;align-items:center;font-size:12px;
+  .stats-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:11px;}
+  .visitcount{display:inline-flex;gap:7px;align-items:center;font-size:12px;
     color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:20px;
     padding:5px 13px;box-shadow:0 1px 2px rgba(16,24,40,.04);font-variant-numeric:tabular-nums;}
   .visitcount b{color:var(--ink);font-weight:700;}
   .visitcount:empty{display:none;}
+  .visitcount.onlinenow{border-color:rgba(34,197,94,.45);}
 
   /* Toolbar */
   .toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px;flex-wrap:wrap;}
@@ -415,10 +417,12 @@
   .alert .adate .ad{font-size:13.5px;font-weight:800;letter-spacing:-.01em;}
   .alert .atext{font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.35;}
   .alert .acoming{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);}
-  .alert .ac-line{display:flex;align-items:baseline;gap:6px;font-size:11px;line-height:1.3;}
+  .alert .ac-line{display:flex;align-items:baseline;gap:5px;font-size:11.5px;line-height:1.25;}
   .alert .ac-line .ac-ic{font-size:12px;}
-  .alert .ac-line .ac-when{font-weight:800;color:var(--fc,#4F46E5);white-space:nowrap;}
-  .alert .ac-line .ac-txt{color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .alert .ac-line .ac-date{font-weight:800;color:var(--fc,#4F46E5);white-space:nowrap;
+    font-variant-numeric:tabular-nums;}
+  .alert .ac-title{font-size:11px;color:var(--sub);margin-top:2px;line-height:1.3;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .alert .acoming .adots{margin-top:6px;}
   .alert .adots{display:flex;gap:5px;margin-top:8px;}
   .alert .adots span{width:6px;height:6px;border-radius:50%;background:var(--line);cursor:pointer;transition:width .2s,background .2s;}
@@ -547,7 +551,10 @@
   <footer>
     <b>Mon–Thu</b> fixed · <b>Fri</b> rotates one per school week.<br>
     Can’t drive your day? Arrange a swap with the group.
-    <div class="visitcount" id="visitCount"></div>
+    <div class="stats-row">
+      <div class="visitcount" id="visitCount"></div>
+      <div class="visitcount onlinenow" id="onlineNow"></div>
+    </div>
   </footer>
 </div>
 
@@ -967,12 +974,12 @@ function updateComing(){
   const line=document.createElement('div'); line.className='ac-line';
   line.style.setProperty('--fc',f.color);
   const ic=document.createElement('span'); ic.className='ac-ic'; ic.textContent=f.icon;
-  const wh=document.createElement('span'); wh.className='ac-when'; wh.textContent=f.when||'';
-  const tx=document.createElement('span'); tx.className='ac-txt'; tx.textContent=f.title;
-  line.append(ic,wh,tx);
-  let dots='';
+  const dt=document.createElement('span'); dt.className='ac-date';
+  dt.textContent='📅 '+(f.date||f.when||'');
+  line.append(ic,dt);
+  const tx=document.createElement('div'); tx.className='ac-title'; tx.textContent=f.title;
   const wrap=document.createElement('div');
-  wrap.appendChild(line);
+  wrap.append(line,tx);
   if(futureItems.length>1){
     const dd=document.createElement('div'); dd.className='adots';
     futureItems.forEach((_,i)=>{const s=document.createElement('span'); if(i===futureIdx%futureItems.length)s.className='on';
@@ -1662,6 +1669,24 @@ document.getElementById('cal').addEventListener('click',e=>{
       const v=(s.visits||0).toLocaleString(), u=(s.unique||0).toLocaleString();
       el.innerHTML=`👀 <b>${v}</b> visits · <b>${u}</b> visitors`;
     },err=>{/* stats rule not published yet */});
+  }catch(e){}
+})();
+
+// ---- Live "online now" presence ----
+(function presence(){
+  if(!fbOK) return;
+  try{
+    const sid='p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    const pRef=fbDb.ref('presence/'+sid);
+    const beat=()=>pRef.set({t:Date.now()}).catch(()=>{});
+    fbDb.ref('.info/connected').on('value',s=>{ if(s.val()===true){ pRef.onDisconnect().remove(); beat(); } });
+    setInterval(beat,25000);
+    fbDb.ref('presence').on('value',snap=>{
+      const d=snap.val()||{}, now=Date.now(); let n=0;
+      Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000) n++; });
+      const el=document.getElementById('onlineNow'); if(!el) return;
+      el.innerHTML=`🟢 <b>${n}</b> online now`;
+    },err=>{/* presence rule not published yet */});
   }catch(e){}
 })();
 
