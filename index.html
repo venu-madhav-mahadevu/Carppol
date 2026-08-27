@@ -229,6 +229,11 @@
   .rider .rwith{font-size:11px;color:var(--sub);font-weight:500;margin-top:2px;}
   .rider .rbday{font-size:11px;font-weight:700;color:#DB2777;margin-top:3px;}
   .rider .av.photo{background-size:cover;background-position:center;color:transparent;}
+  .rider .kphoto-btn{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:8px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;
+    box-shadow:0 2px 6px -3px rgba(16,24,40,.4);}
+  .rider .kphoto-btn:hover{border-color:var(--venu);}
   .cell.bday{box-shadow:inset 0 0 0 2px #DB2777;}
   .cell .bday-flag{position:absolute;top:2px;left:3px;font-size:9px;line-height:1;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.25));}
@@ -404,6 +409,10 @@
   .alert .adate .aw{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.9;}
   .alert .adate .ad{font-size:13.5px;font-weight:800;letter-spacing:-.01em;}
   .alert .atext{font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .alert .adots{display:flex;gap:5px;margin-top:8px;}
+  .alert .adots span{width:6px;height:6px;border-radius:50%;background:var(--line);cursor:pointer;transition:width .2s,background .2s;}
+  .alert .adots span.on{width:15px;border-radius:4px;background:var(--ac,#4F46E5);}
+  @keyframes acFade{from{opacity:.25;transform:translateY(3px);}to{opacity:1;transform:none;}}
   .alert .aclose{position:absolute;top:7px;right:8px;width:20px;height:20px;border:none;
     background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;
     border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;}
@@ -927,26 +936,42 @@ function collectAlerts(){
   }
   return list.slice(0,6);
 }
-function showAlert(a,delay){
-  const el=document.createElement('div');
-  el.className='alert';
-  el.style.setProperty('--ac',a.color);
-  el.style.animationDelay=delay+'s';
-  el.innerHTML=`<div class="aicon">${a.icon}</div>`+
-    `<div class="abody">`+
-    (a.date?`<div class="adate"><span class="aw">📅 ${a.when||''}</span><span class="ad">${a.date}</span></div>`:'')+
-    `<div class="atitle">${a.title}</div>`+
-    `<div class="atext">${a.text}</div></div>`+
-    `<button class="aclose" aria-label="Dismiss">×</button>`;
-  const close=()=>{el.classList.add('out');setTimeout(()=>el.remove(),350);};
-  el.querySelector('.aclose').addEventListener('click',close);
-  // persistent: no auto-dismiss timer — stays until the user closes it
-  alertsBox.appendChild(el);
+// One compact card that rotates through the alerts (doesn't stack / block the calendar)
+let alertItems=[], alertIdx=0, alertTimer=null;
+function stopAlertRotate(){ if(alertTimer){clearInterval(alertTimer);alertTimer=null;} }
+function startAlertRotate(){ stopAlertRotate(); if(alertItems.length>1) alertTimer=setInterval(()=>{alertIdx=(alertIdx+1)%alertItems.length;updateAlertCard();},5000); }
+function updateAlertCard(){
+  if(!alertItems.length) return;
+  const a=alertItems[alertIdx%alertItems.length];
+  const card=alertsBox.querySelector('.alert'); if(!card) return;
+  card.style.setProperty('--ac',a.color);
+  card.querySelector('#acIcon').textContent=a.icon;
+  const dateEl=card.querySelector('#acDate');
+  dateEl.innerHTML=a.date?`<span class="aw">📅 ${a.when||''}</span><span class="ad">${a.date}</span>`:'';
+  dateEl.style.display=a.date?'':'none';
+  card.querySelector('#acTitle').textContent=a.title;
+  card.querySelector('#acText').textContent=a.text;
+  const dots=card.querySelector('#acDots');
+  dots.innerHTML=alertItems.length>1?alertItems.map((_,i)=>`<span class="${i===alertIdx%alertItems.length?'on':''}" data-i="${i}"></span>`).join(''):'';
+  dots.querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>{alertIdx=+s.dataset.i;updateAlertCard();startAlertRotate();}));
+  const body=card.querySelector('.abody'); body.style.animation='none'; void body.offsetWidth; body.style.animation='acFade .3s ease';
 }
 function runAlerts(){
-  alertsBox.innerHTML='';
-  const items=collectAlerts();
-  items.forEach((a,i)=>showAlert(a,i*0.35));
+  stopAlertRotate();
+  alertItems=collectAlerts(); alertIdx=0;
+  if(!alertItems.length){alertsBox.innerHTML='';return;}
+  alertsBox.innerHTML=`<div class="alert alertcard">`+
+    `<div class="aicon" id="acIcon"></div>`+
+    `<div class="abody"><div class="adate" id="acDate"></div>`+
+    `<div class="atitle" id="acTitle"></div><div class="atext" id="acText"></div>`+
+    `<div class="adots" id="acDots"></div></div>`+
+    `<button class="aclose" id="acClose" aria-label="Dismiss">×</button></div>`;
+  const card=alertsBox.querySelector('.alert');
+  card.querySelector('#acClose').addEventListener('click',()=>{stopAlertRotate();alertsBox.innerHTML='';});
+  card.addEventListener('mouseenter',stopAlertRotate);
+  card.addEventListener('mouseleave',startAlertRotate);
+  updateAlertCard();
+  startAlertRotate();
 }
 document.getElementById('alertBtn').addEventListener('click',runAlerts);
 // auto-show shortly after load
@@ -1584,6 +1609,68 @@ document.getElementById('cal').addEventListener('click',e=>{
   const c=e.target.closest('.cell[data-date]'); if(!c) return;
   openLog(c.dataset.date);
 });
+
+// ---- Private kid photos (only visible to signed-in families) ----
+function riderByName(name){return [...document.querySelectorAll('.rider')].find(r=>{const n=r.querySelector('.rname');return n&&n.textContent.trim()===name;});}
+function applyKidPhoto(name,uri){
+  const r=riderByName(name); if(!r) return; const av=r.querySelector('.av'); if(!av) return;
+  if(!av.dataset.initial) av.dataset.initial=av.textContent;
+  if(uri){av.style.backgroundImage=`url('${uri}')`;av.classList.add('photo');av.textContent='';}
+  else{av.style.backgroundImage='';av.classList.remove('photo');av.textContent=av.dataset.initial;}
+}
+function setKidEditMode(on){
+  document.querySelectorAll('.rider').forEach(r=>{
+    const nameEl=r.querySelector('.rname'); if(!nameEl) return;
+    const name=nameEl.textContent.trim();
+    let btn=r.querySelector('.kphoto-btn');
+    if(on){
+      if(!btn){
+        btn=document.createElement('button');btn.className='kphoto-btn';btn.type='button';
+        btn.title='Set photo (private)';btn.textContent='📷';
+        const input=document.createElement('input');input.type='file';input.accept='image/*';
+        input.className='kphoto-input';input.style.display='none';
+        btn.addEventListener('click',()=>input.click());
+        input.addEventListener('change',ev=>onKidPhotoPick(name,ev,btn));
+        r.appendChild(btn);r.appendChild(input);
+      }
+    }else if(btn){btn.remove();const inp=r.querySelector('.kphoto-input');if(inp)inp.remove();}
+  });
+}
+function onKidPhotoPick(name,ev,btn){
+  const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  if(btn) btn.textContent='…';
+  const rd=new FileReader();
+  rd.onload=()=>{const img=new Image();img.onload=()=>{
+    const max=320;let w=img.width,h=img.height;const s=Math.min(max/w,max/h,1);
+    const cw=Math.max(1,Math.round(w*s)),ch=Math.max(1,Math.round(h*s));
+    const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;
+    cv.getContext('2d').drawImage(img,0,0,cw,ch);
+    const uri=cv.toDataURL('image/jpeg',0.82);
+    fbDb.ref('kids/'+name).set({photo:uri,by:currentUser?currentUser.uid:null,ts:Date.now()})
+      .then(()=>{if(btn)btn.textContent='📷';})
+      .catch(err=>{if(btn)btn.textContent='📷';alert('Could not save photo: '+(err.message||''));});
+  };img.onerror=()=>{if(btn)btn.textContent='📷';alert('That image could not be read.');};img.src=rd.result;};
+  rd.readAsDataURL(file);
+}
+let kidsRef=null;
+if(fbOK){
+  fbAuth.onAuthStateChanged(u=>{
+    if(u){
+      setKidEditMode(true);
+      if(!kidsRef){
+        kidsRef=fbDb.ref('kids');
+        kidsRef.on('value',snap=>{const data=snap.val()||{};
+          document.querySelectorAll('.rider').forEach(r=>{const n=r.querySelector('.rname');if(!n)return;
+            const nm=n.textContent.trim();applyKidPhoto(nm,(data[nm]&&data[nm].photo)||null);});
+        },err=>{/* not authorized / rules */});
+      }
+    }else{
+      setKidEditMode(false);
+      if(kidsRef){kidsRef.off();kidsRef=null;}
+      document.querySelectorAll('.rider').forEach(r=>{const n=r.querySelector('.rname');if(n)applyKidPhoto(n.textContent.trim(),null);});
+    }
+  });
+}
 </script>
 </body>
 </html>
