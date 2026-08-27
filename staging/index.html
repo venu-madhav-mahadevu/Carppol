@@ -522,6 +522,9 @@
   .chat-input button{flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;
     background:var(--venu);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;}
   .chat-empty{margin:auto;text-align:center;color:var(--sub);font-size:13px;padding:20px;}
+  .chat-online{font-size:12px;color:var(--sub);background:rgba(34,197,94,.1);
+    border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:7px 11px;margin-bottom:10px;}
+  .chat-online b{color:var(--ink);}
 
   /* Countdown chip */
   .countchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
@@ -1896,6 +1899,7 @@ function watchUnread(){
         },err=>{});
       }
     }else{ if(unreadRef){unreadRef.off();unreadRef=null;} setChatBadge(0); }
+    if(window.__beatPresence) window.__beatPresence(); // update presence name on login/logout
   });
 }
 watchUnread();
@@ -1914,12 +1918,16 @@ function openChat(){
   }
   chatModal.innerHTML=`<button class="mclose" id="chcloseBtn" aria-label="Close">×</button>`+
     `<h2>💬 Carpool Chat</h2>`+
+    `<div class="chat-online" id="chatOnline"></div>`+
     `<div class="chat-list" id="chatList"><div class="chat-empty">Loading…</div></div>`+
     `<div class="chat-input"><input id="chatInput" type="text" placeholder="Message the group…" maxlength="500" autocomplete="off">`+
     `<button id="chatSend" aria-label="Send">➤</button></div>`;
   chatModal.querySelector('#chcloseBtn').addEventListener('click',closeChat);
   chatModal.querySelector('#chatSend').addEventListener('click',sendMsg);
   chatModal.querySelector('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg();});
+  // seed the online list from the last presence snapshot
+  const co=chatModal.querySelector('#chatOnline'); const names=window.__onlineNames||[];
+  if(co) co.innerHTML=names.length?`🟢 Online: <b>${names.map(esc).join(', ')}</b>`:`🟢 No family members online right now`;
   listenMsgs();
   setTimeout(()=>{const i=chatModal.querySelector('#chatInput');if(i)i.focus();},80);
 }
@@ -2035,13 +2043,18 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
   try{
     const sid='p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
     const pRef=fbDb.ref('presence/'+sid);
-    const beat=()=>pRef.set({t:Date.now()}).catch(()=>{});
+    const myPresenceName=()=>currentUser?((currentUser.displayName)||(currentUser.email||'').split('@')[0]||null):null;
+    const beat=()=>pRef.set({t:Date.now(),name:myPresenceName()}).catch(()=>{});
     fbDb.ref('.info/connected').on('value',s=>{ if(s.val()===true){ pRef.onDisconnect().remove(); beat(); } });
     setInterval(beat,25000);
+    window.__beatPresence=beat; // re-beat with name right after login
     fbDb.ref('presence').on('value',snap=>{
-      const d=snap.val()||{}, now=Date.now(); let n=0;
-      Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000) n++; });
+      const d=snap.val()||{}, now=Date.now(); let n=0; const names=[];
+      Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000){ n++; if(v.name&&names.indexOf(v.name)<0) names.push(v.name); } });
       document.querySelectorAll('.jsOnline').forEach(el=>el.innerHTML=`🟢 <b>${n}</b> online now`);
+      window.__onlineNames=names;
+      const co=document.getElementById('chatOnline');
+      if(co) co.innerHTML = names.length?`🟢 Online: <b>${names.map(esc).join(', ')}</b>`:`🟢 No family members online right now`;
     },err=>{/* presence rule not published yet */});
   }catch(e){}
 })();
