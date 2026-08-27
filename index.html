@@ -466,6 +466,40 @@
   }
   @media print{.alerts{display:none;}}
 
+  /* Swap board */
+  .swap-form{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;
+    background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px;}
+  .swap-form .row{display:flex;gap:8px;}
+  .swap-form .row .finput,.swap-form .row .fselect{flex:1;}
+  .swap-sec{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin:14px 0 8px;}
+  .swapcard{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;
+    background:var(--card);border:1px solid var(--line);margin-bottom:9px;position:relative;overflow:hidden;}
+  .swapcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sc,#F59E0B);}
+  .swapcard.open{--sc:#F59E0B;} .swapcard.covered{--sc:#22C55E;} .swapcard.past{--sc:#94A3B8;opacity:.7;}
+  .swapcard .sc-av{width:34px;height:34px;flex:none;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:700;font-size:14px;font-family:'Fraunces',Georgia,serif;background:var(--scg,#94A3B8);}
+  .swapcard .sc-info{flex:1;min-width:0;}
+  .swapcard .sc-when{font-weight:700;font-size:13px;}
+  .swapcard .sc-sub{font-size:11.5px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .swapcard .sc-act{flex:none;font:inherit;font-size:12px;font-weight:700;color:#fff;background:#22C55E;
+    border:none;border-radius:20px;padding:6px 12px;cursor:pointer;}
+  .swapcard .sc-act.cancel{background:var(--holiday);color:var(--kumar);}
+  .swapcard .sc-tag{flex:none;font-size:11px;font-weight:700;color:#22C55E;}
+  /* Stats bars */
+  .sbar-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;}
+  .sbar-name{width:64px;flex:none;font-weight:700;}
+  .sbar{flex:1;height:12px;border-radius:7px;background:var(--holiday);overflow:hidden;}
+  .sbar span{display:block;height:100%;border-radius:7px;transition:width .8s cubic-bezier(.2,.7,.3,1);}
+  .sbar-count{width:64px;flex:none;text-align:right;color:var(--sub);font-weight:700;font-size:12px;}
+  .stat-note{font-size:12px;color:var(--sub);margin:6px 0 14px;line-height:1.5;}
+  /* Countdown chip */
+  .countchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    background:var(--card);border:1px solid var(--line);border-radius:20px;padding:5px 12px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);margin-top:10px;}
+  .countchip b{color:var(--ink);font-weight:800;}
+  .countchip .cc-em{font-size:14px;}
+
   /* Falling flowers */
   .petals{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:9999;}
   .petal{position:absolute;top:-8%;will-change:transform,opacity;
@@ -512,6 +546,8 @@
     <button class="btn" id="whereBtn" type="button">🚗 Where?</button>
     <button class="btn" id="liveBtn" type="button">📍 Live</button>
     <button class="btn" id="logBtn" type="button">🕐 Times</button>
+    <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
+    <button class="btn" id="statsBtn" type="button">📊 Stats</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
@@ -525,6 +561,14 @@
 
   <div class="overlay" id="whereOverlay" role="dialog" aria-modal="true" aria-label="Where is the car">
     <div class="modal" id="whereModal"></div>
+  </div>
+
+  <div class="overlay" id="swapOverlay" role="dialog" aria-modal="true" aria-label="Swap board">
+    <div class="modal" id="swapModal"></div>
+  </div>
+
+  <div class="overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-label="Driving stats">
+    <div class="modal" id="statsModal"></div>
   </div>
 
   <div class="overlay" id="logOverlay" role="dialog" aria-modal="true" aria-label="Carpool timings">
@@ -1682,6 +1726,143 @@ document.getElementById('cal').addEventListener('click',e=>{
   const c=e.target.closest('.cell[data-date]'); if(!c) return;
   openLog(c.dataset.date);
 });
+
+// ---- Swap Board ----
+const swapOverlay=document.getElementById('swapOverlay');
+const swapModal=document.getElementById('swapModal');
+const SGRAD={venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777'};
+let swapsRef=null;
+function swapShell(inner){
+  swapModal.innerHTML=`<button class="mclose" id="swcloseBtn" aria-label="Close">×</button>`+
+    `<h2>🔁 Swap Board</h2>`+inner;
+  swapModal.querySelector('#swcloseBtn').addEventListener('click',closeSwaps);
+}
+function openSwaps(){
+  swapOverlay.classList.add('open');
+  if(!fbOK){ swapShell(`<div class="where-empty">Set up Firebase to use the swap board.</div>`); return; }
+  if(!currentUser){
+    swapShell(`<div class="where-empty">Sign in to post and cover swaps.</div>`+
+      `<button class="mbtn live" id="swLogin">🔐 Sign in</button>`);
+    swapModal.querySelector('#swLogin').addEventListener('click',()=>{closeSwaps();openLive();});
+    return;
+  }
+  const today=localDateStr(Date.now());
+  swapShell(
+    `<div class="msub">Can’t drive your day? Post it — another family can cover.</div>`+
+    `<div class="swap-form">`+
+      `<input class="finput" type="date" id="swDate" value="${today}" min="${today}">`+
+      `<div class="row"><select class="fselect" id="swSlot">`+
+        `<option value="Both">Both ways</option><option value="Morning">Morning only</option><option value="Afternoon">Afternoon only</option></select></div>`+
+      `<input class="finput" id="swNote" type="text" placeholder="Note (optional) — e.g. early meeting" maxlength="80">`+
+      `<button class="mbtn live" id="swPost">Post swap request</button>`+
+    `</div>`+
+    `<div id="swList"><div class="where-empty">Loading…</div></div>`);
+  swapModal.querySelector('#swPost').addEventListener('click',postSwap);
+  listenSwaps();
+}
+function postSwap(){
+  const date=swapModal.querySelector('#swDate').value;
+  const slot=swapModal.querySelector('#swSlot').value;
+  const note=swapModal.querySelector('#swNote').value.trim();
+  if(!date){return;}
+  const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
+  fbDb.ref('swaps').push({date,slot,note,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
+    .then(()=>{swapModal.querySelector('#swNote').value='';})
+    .catch(err=>alert('Could not post: '+(err.message||'')));
+}
+function claimSwap(id,s){
+  const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
+  fbDb.ref('swaps/'+id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverTs:Date.now()})
+    .catch(err=>alert('Could not cover: '+(err.message||'')));
+}
+function cancelSwap(id){ fbDb.ref('swaps/'+id).remove().catch(()=>{}); }
+function listenSwaps(){
+  swapsRef=fbDb.ref('swaps');
+  swapsRef.on('value',snap=>{
+    const data=snap.val()||{}, today=localDateStr(Date.now());
+    const rows=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    const open=rows.filter(r=>r.status!=='covered'&&r.date>=today);
+    const covered=rows.filter(r=>r.status==='covered'&&r.date>=today);
+    const past=rows.filter(r=>r.date<today).slice(-5);
+    const list=swapModal.querySelector('#swList'); if(!list) return;
+    const card=r=>{
+      const g=SGRAD[PCLASS[r.byName]]||'#94A3B8';
+      const cls=r.status==='covered'?'covered':(r.date<today?'past':'open');
+      const mine=r.by===currentUser.uid;
+      let action='';
+      if(cls==='open'&&!mine) action=`<button class="sc-act" data-claim="${r.id}">I’ll cover</button>`;
+      else if(cls==='open'&&mine) action=`<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`;
+      else if(cls==='covered') action=`<span class="sc-tag">✅ ${esc(r.coverName||'covered')}</span>`;
+      return `<div class="swapcard ${cls}" style="--scg:${g}"><div class="sc-av">${esc((r.byName||'?')[0])}</div>`+
+        `<div class="sc-info"><div class="sc-when">${esc(r.byName||'Driver')} · ${fmtDay(r.date)}</div>`+
+        `<div class="sc-sub">${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}</div></div>${action}</div>`;
+    };
+    list.innerHTML=
+      `<div class="swap-sec">🔴 Open requests</div>`+(open.length?open.map(card).join(''):`<div class="where-empty" style="padding:12px">No open requests 🎉</div>`)+
+      (covered.length?`<div class="swap-sec">✅ Covered</div>`+covered.map(card).join(''):'')+
+      (past.length?`<div class="swap-sec">🕓 Recent</div>`+past.map(card).join(''):'');
+    list.querySelectorAll('[data-claim]').forEach(b=>b.addEventListener('click',()=>claimSwap(b.dataset.claim)));
+    list.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelSwap(b.dataset.cancel)));
+  },err=>{const l=swapModal.querySelector('#swList');if(l)l.innerHTML=`<div class="where-empty">Couldn’t load swaps.<br>${esc(err.message||'')}</div>`;});
+}
+function closeSwaps(){ if(swapsRef){swapsRef.off();swapsRef=null;} swapOverlay.classList.remove('open'); }
+document.getElementById('swapBtn').addEventListener('click',openSwaps);
+swapOverlay.addEventListener('click',e=>{if(e.target===swapOverlay)closeSwaps();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
+
+// ---- Driving Stats ----
+const statsOverlay=document.getElementById('statsOverlay');
+const statsModal=document.getElementById('statsModal');
+function openStats(){
+  statsOverlay.classList.add('open');
+  const NM=['Venu','Shiva','Charan','Kumar'];
+  const counts={}; NM.forEach(n=>counts[n]=0);
+  document.querySelectorAll('.cell[data-person]').forEach(c=>{if(counts[c.dataset.person]!=null)counts[c.dataset.person]++;});
+  const total=Object.values(counts).reduce((a,b)=>a+b,0), max=Math.max(1,...Object.values(counts));
+  const bars=NM.map(n=>`<div class="sbar-row"><span class="sbar-name">${n}</span>`+
+    `<span class="sbar"><span style="width:${counts[n]/max*100}%;background:${SGRAD[PCLASS[n]]}"></span></span>`+
+    `<span class="sbar-count">${counts[n]} days</span></div>`).join('');
+  statsModal.innerHTML=`<button class="mclose" id="stcloseBtn" aria-label="Close">×</button>`+
+    `<h2>📊 Driving Fairness</h2>`+
+    `<div class="stat-note">Scheduled driving days across the whole 2026–27 year · <b>${total}</b> total.</div>`+
+    bars+`<div id="tripStats" class="stat-note"></div>`;
+  statsModal.querySelector('#stcloseBtn').addEventListener('click',closeStats);
+  // trip stats from recorded tracks (signed-in only)
+  if(fbOK&&currentUser){
+    const ts=statsModal.querySelector('#tripStats'); ts.textContent='Loading recorded trips…';
+    fbDb.ref('tracks').once('value').then(snap=>{
+      const data=snap.val()||{}; const perName={}; let trips=0, ms=0;
+      Object.values(data).forEach(sessions=>Object.values(sessions||{}).forEach(sess=>{
+        const m=sess&&sess.meta; if(!m||!m.start)return; trips++;
+        if(m.end){ms+=(m.end-m.start); perName[m.name]=(perName[m.name]||0)+1;}
+      }));
+      const hrs=(ms/3600000); const names=Object.entries(perName).map(([n,c])=>`${esc(n)} ${c}`).join(' · ');
+      ts.innerHTML=`🚗 <b>${trips}</b> recorded trips · <b>${hrs.toFixed(1)}h</b> driven${names?'<br>'+names:''}`;
+    }).catch(()=>{ts.textContent='';});
+  }
+}
+function closeStats(){ statsOverlay.classList.remove('open'); }
+document.getElementById('statsBtn').addEventListener('click',openStats);
+statsOverlay.addEventListener('click',e=>{if(e.target===statsOverlay)closeStats();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
+
+// ---- Countdown chip (next break / next birthday) ----
+(function countdown(){
+  const host=document.querySelector('header.top .stats-row'); if(!host) return;
+  // next multi-day break start
+  const brDates=Object.keys(NO_SCHOOL).sort();
+  let nextBreak=null;
+  for(const d of brDates){ if(d>=TODAY){ nextBreak={date:d,label:NO_SCHOOL[d]}; break; } }
+  // next birthday
+  let nextBd=null;
+  for(const nm in BIRTHDAYS){ const info=nextBirthdayInfo(BIRTHDAYS[nm]); if(info&&(!nextBd||info.days<nextBd.days)) nextBd={name:nm,...info}; }
+  const chips=[];
+  if(nextBreak){ const dd=daysAway(nextBreak.date);
+    if(dd>=0&&dd<=60) chips.push(`<span class="countchip"><span class="cc-em">🏖️</span> <b>${dd}</b> day${dd===1?'':'s'} to ${esc(nextBreak.label)}</span>`); }
+  if(nextBd&&nextBd.days<=90) chips.push(`<span class="countchip"><span class="cc-em">🎂</span> <b>${nextBd.days}</b> day${nextBd.days===1?'':'s'} to ${esc(nextBd.name)}’s birthday</span>`);
+  if(chips.length){ const wrap=document.createElement('div'); wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%';
+    wrap.innerHTML=chips.join(''); host.parentNode.insertBefore(wrap,host.nextSibling); }
+})();
 
 // ---- Visitor counter (public /stats) ----
 (function visitorCounter(){
