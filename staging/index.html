@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>School Carpool Calendar 2026–27</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4F46E5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Carpool">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -573,6 +579,7 @@
     <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
     <button class="btn" id="statsBtn" type="button">📊 Stats</button>
     <button class="btn" id="chatBtn" type="button">💬 Chat</button>
+    <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
@@ -1838,6 +1845,26 @@ function closeSwaps(){ if(swapsRef){swapsRef.off();swapsRef=null;} swapOverlay.c
 document.getElementById('swapBtn').addEventListener('click',openSwaps);
 swapOverlay.addEventListener('click',e=>{if(e.target===swapOverlay)closeSwaps();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
+
+// ---- PWA: install to home screen ----
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+(function pwaInstall(){
+  const btn=document.getElementById('installBtn'); if(!btn) return;
+  let deferred=null;
+  const standalone=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; btn.style.display=''; });
+  if(isIOS && !standalone) btn.style.display=''; // iOS has no prompt event
+  btn.addEventListener('click',async()=>{
+    if(deferred){ deferred.prompt(); const {outcome}=await deferred.userChoice; deferred=null;
+      if(outcome==='accepted') btn.style.display='none'; }
+    else if(isIOS){ alert('To install on iPhone/iPad:\n\nTap the Share button (□↑) at the bottom of Safari, then choose “Add to Home Screen”.'); }
+    else { alert('To install: open your browser menu (⋮) and choose “Install app” / “Add to Home screen”.'); }
+  });
+  window.addEventListener('appinstalled',()=>{ btn.style.display='none'; });
+})();
 
 // ---- Group Messenger ----
 const chatOverlay=document.getElementById('chatOverlay');
