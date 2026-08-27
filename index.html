@@ -227,6 +227,11 @@
     background:var(--rg);-webkit-background-clip:text;background-clip:text;
     -webkit-text-fill-color:transparent;}
   .rider .rwith{font-size:11px;color:var(--sub);font-weight:500;margin-top:2px;}
+  .rider .rbday{font-size:11px;font-weight:700;color:#DB2777;margin-top:3px;}
+  .rider .av.photo{background-size:cover;background-position:center;color:transparent;}
+  .cell.bday{box-shadow:inset 0 0 0 2px #DB2777;}
+  .cell .bday-flag{position:absolute;top:2px;left:3px;font-size:9px;line-height:1;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.25));}
   .rider .rwith b{color:var(--rc);font-weight:700;}
   @media (max-width:400px){.rider-grid{grid-template-columns:1fr;}}
 
@@ -540,6 +545,15 @@ const RECORD_WINDOWS = {
   minDayAfternoon: { start:'12:00', end:'13:00', label:'Afternoon (minimum day)' }
 };
 
+/* ===== EDIT HERE: kids' birthdays. month = 1-12, day = 1-31. year optional (shows age).
+   photo optional: a file you add to the repo (e.g. 'kundana.jpg') or a data: URI. */
+const BIRTHDAYS = {
+  'Kundana':    { month:11, day:10, year:null, photo:'' },
+  'Krupa':      { month:0,  day:0,  year:null, photo:'' },
+  'Ishanvi':    { month:0,  day:0,  year:null, photo:'' },
+  'Srininidhi': { month:0,  day:0,  year:null, photo:'' }
+};
+
 /* ===== EDIT HERE: paste your Firebase project config (Console → Project settings → Web app)
    These values are safe to be public. Live tracking stays disabled until apiKey is filled. */
 const FIREBASE_CONFIG = {
@@ -674,6 +688,45 @@ buildBanner();
 // ---- Staggered entrance for month cards ----
 document.querySelectorAll('.month').forEach((m,i)=>{
   m.style.animationDelay=Math.min(i*0.06,0.6)+'s';
+});
+
+// ---- Birthdays ----
+function pad0b(n){return String(n).padStart(2,'0');}
+function nextBirthdayInfo(b){
+  if(!b||!b.month||!b.day) return null;
+  const t=new Date(...TODAY.split('-').map((v,i)=>i===1?v-1:+v));
+  const todayMid=new Date(t.getFullYear(),t.getMonth(),t.getDate());
+  let d=new Date(t.getFullYear(),b.month-1,b.day);
+  if(d<todayMid) d=new Date(t.getFullYear()+1,b.month-1,b.day);
+  const iso=`${d.getFullYear()}-${pad0b(d.getMonth()+1)}-${pad0b(d.getDate())}`;
+  const days=Math.round((d-todayMid)/86400000);
+  const age=b.year?(d.getFullYear()-b.year):null;
+  return {iso,days,age,label:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})};
+}
+// show birthday date (+ photo) on each Kids card
+document.querySelectorAll('.rider').forEach(r=>{
+  const nameEl=r.querySelector('.rname'); if(!nameEl) return;
+  const name=nameEl.textContent.trim();
+  const b=BIRTHDAYS[name]; const info=nextBirthdayInfo(b);
+  if(info){
+    const line=document.createElement('div'); line.className='rbday';
+    line.innerHTML=`🎂 ${info.label}${info.age?` · turns ${info.age}`:''}`;
+    (r.querySelector('.rtxt')||r).appendChild(line);
+  }
+  if(b&&b.photo){
+    const av=r.querySelector('.av');
+    if(av){av.style.backgroundImage=`url('${b.photo}')`;av.classList.add('photo');av.textContent='';}
+  }
+});
+// birthday badge on the calendar date
+document.querySelectorAll('.cell[data-date]').forEach(c=>{
+  const [Y,M,D]=c.dataset.date.split('-').map(Number);
+  for(const nm in BIRTHDAYS){const b=BIRTHDAYS[nm];
+    if(b&&b.month===M&&b.day===D){
+      c.classList.add('bday'); c.title=`🎂 ${nm}'s birthday`;
+      const f=document.createElement('span'); f.className='bday-flag'; f.textContent='🎂';
+      c.appendChild(f); break;
+    }}
 });
 
 // ---- Person filter (tap legend chip) ----
@@ -833,6 +886,16 @@ function collectAlerts(){
       list.push({icon:'➡️',color:AC[PCLASS[dt]],date:fmtDay(tmr),when:'Tomorrow',
         title:`${dt} drives tomorrow`,text:e?'Minimum day · pickup 12:45 PM':'Pickup 2:00 PM'});}
   }
+  // 2b) Upcoming birthdays (within 30 days)
+  Object.keys(BIRTHDAYS).forEach(nm=>{
+    const info=nextBirthdayInfo(BIRTHDAYS[nm]);
+    if(info&&info.days<=30){
+      list.push({icon:'🎂',color:'#DB2777',date:fmtDay(info.iso),
+        when:info.days===0?'Today 🎉':info.days===1?'Tomorrow':`In ${info.days} days`,
+        title:`${nm}'s birthday${info.days===0?' is today!':''}`,
+        text:info.age?`Turns ${info.age} 🎉`:'🎉 Don’t forget to wish her!'});
+    }
+  });
   // 3) Next minimum day ahead (up to ~45 days)
   let mScan=addDays(TODAY,1);
   for(let i=0;i<45;i++){ if(mScan>LAST) break;
