@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>School Carpool Calendar 2026–27</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4F46E5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Carpool">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -154,6 +160,11 @@
     transition:border-color .15s,box-shadow .2s,transform .12s,background .15s;}
   .btn:hover{border-color:var(--venu);box-shadow:0 4px 12px -5px rgba(79,70,229,.5);transform:translateY(-1px);}
   .btn:active{transform:scale(.96);}
+  .btn{position:relative;}
+  .btn-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;border-radius:9px;
+    background:#EF4444;color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;
+    justify-content:center;padding:0 4px;box-shadow:0 0 0 2px var(--paper);animation:badgePop .25s ease;}
+  @keyframes badgePop{from{transform:scale(0);}to{transform:scale(1);}}
   .authbadge{display:inline-flex;align-items:center;gap:7px;margin-right:auto;font:inherit;
     font-size:12.5px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);
     border-radius:20px;padding:6px 13px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);
@@ -511,6 +522,9 @@
   .chat-input button{flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;
     background:var(--venu);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;}
   .chat-empty{margin:auto;text-align:center;color:var(--sub);font-size:13px;padding:20px;}
+  .chat-online{font-size:12px;color:var(--sub);background:rgba(34,197,94,.1);
+    border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:7px 11px;margin-bottom:10px;}
+  .chat-online b{color:var(--ink);}
 
   /* Countdown chip */
   .countchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
@@ -568,6 +582,7 @@
     <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
     <button class="btn" id="statsBtn" type="button">📊 Stats</button>
     <button class="btn" id="chatBtn" type="button">💬 Chat</button>
+    <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
@@ -1834,13 +1849,63 @@ document.getElementById('swapBtn').addEventListener('click',openSwaps);
 swapOverlay.addEventListener('click',e=>{if(e.target===swapOverlay)closeSwaps();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
 
+// ---- PWA: install to home screen ----
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+(function pwaInstall(){
+  const btn=document.getElementById('installBtn'); if(!btn) return;
+  let deferred=null;
+  const standalone=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; btn.style.display=''; });
+  if(isIOS && !standalone) btn.style.display=''; // iOS has no prompt event
+  btn.addEventListener('click',async()=>{
+    if(deferred){ deferred.prompt(); const {outcome}=await deferred.userChoice; deferred=null;
+      if(outcome==='accepted') btn.style.display='none'; }
+    else if(isIOS){ alert('To install on iPhone/iPad:\n\nTap the Share button (□↑) at the bottom of Safari, then choose “Add to Home Screen”.'); }
+    else { alert('To install: open your browser menu (⋮) and choose “Install app” / “Add to Home screen”.'); }
+  });
+  window.addEventListener('appinstalled',()=>{ btn.style.display='none'; });
+})();
+
 // ---- Group Messenger ----
 const chatOverlay=document.getElementById('chatOverlay');
 const chatModal=document.getElementById('chatModal');
-let msgsRef=null;
+let msgsRef=null, unreadRef=null, chatOpen=false, chatLastSeen=0;
+try{chatLastSeen=parseInt(localStorage.getItem('carpool-chat-seen')||'0',10)||0;}catch(e){}
+function setChatBadge(n){
+  const b=document.getElementById('chatBtn'); if(!b) return;
+  let dot=b.querySelector('.btn-badge');
+  if(n>0){ if(!dot){dot=document.createElement('span');dot.className='btn-badge';b.appendChild(dot);} dot.textContent=n>9?'9+':String(n); }
+  else if(dot){ dot.remove(); }
+}
+function markChatSeen(latest){
+  chatLastSeen=Math.max(chatLastSeen,latest||Date.now());
+  try{localStorage.setItem('carpool-chat-seen',String(chatLastSeen));}catch(e){}
+  setChatBadge(0);
+}
+function watchUnread(){
+  if(!fbOK) return;
+  fbAuth.onAuthStateChanged(u=>{
+    if(u){
+      if(!unreadRef){
+        unreadRef=fbDb.ref('messages').limitToLast(50);
+        unreadRef.on('value',snap=>{
+          let latest=0, unread=0;
+          snap.forEach(ch=>{const v=ch.val(); if(!v||!v.ts) return; latest=Math.max(latest,v.ts);
+            if(v.ts>chatLastSeen && v.by!==u.uid) unread++;});
+          if(chatOpen) markChatSeen(latest); else setChatBadge(unread);
+        },err=>{});
+      }
+    }else{ if(unreadRef){unreadRef.off();unreadRef=null;} setChatBadge(0); }
+    if(window.__beatPresence) window.__beatPresence(); // update presence name on login/logout
+  });
+}
+watchUnread();
 function chatMyName(){ return (currentUser.displayName)||(currentUser.email||'Driver').split('@')[0]; }
 function openChat(){
-  chatOverlay.classList.add('open');
+  chatOverlay.classList.add('open'); chatOpen=true; markChatSeen(Date.now());
   if(!fbOK){ chatModal.innerHTML=`<button class="mclose" id="chcloseBtn">×</button><h2>💬 Carpool Chat</h2><div class="chat-empty">Set up Firebase to use chat.</div>`;
     chatModal.querySelector('#chcloseBtn').addEventListener('click',closeChat); return; }
   if(!currentUser){
@@ -1853,12 +1918,16 @@ function openChat(){
   }
   chatModal.innerHTML=`<button class="mclose" id="chcloseBtn" aria-label="Close">×</button>`+
     `<h2>💬 Carpool Chat</h2>`+
+    `<div class="chat-online" id="chatOnline"></div>`+
     `<div class="chat-list" id="chatList"><div class="chat-empty">Loading…</div></div>`+
     `<div class="chat-input"><input id="chatInput" type="text" placeholder="Message the group…" maxlength="500" autocomplete="off">`+
     `<button id="chatSend" aria-label="Send">➤</button></div>`;
   chatModal.querySelector('#chcloseBtn').addEventListener('click',closeChat);
   chatModal.querySelector('#chatSend').addEventListener('click',sendMsg);
   chatModal.querySelector('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg();});
+  // seed the online list from the last presence snapshot
+  const co=chatModal.querySelector('#chatOnline'); const names=window.__onlineNames||[];
+  if(co) co.innerHTML=names.length?`🟢 Online: <b>${names.map(esc).join(', ')}</b>`:`🟢 No family members online right now`;
   listenMsgs();
   setTimeout(()=>{const i=chatModal.querySelector('#chatInput');if(i)i.focus();},80);
 }
@@ -1887,7 +1956,7 @@ function sendMsg(){
   fbDb.ref('messages').push({text,by:currentUser.uid,byName:chatMyName(),ts:Date.now()})
     .catch(err=>alert('Could not send: '+(err.message||'')));
 }
-function closeChat(){ if(msgsRef){msgsRef.off();msgsRef=null;} chatOverlay.classList.remove('open'); }
+function closeChat(){ chatOpen=false; if(msgsRef){msgsRef.off();msgsRef=null;} chatOverlay.classList.remove('open'); }
 document.getElementById('chatBtn').addEventListener('click',openChat);
 chatOverlay.addEventListener('click',e=>{if(e.target===chatOverlay)closeChat();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeChat();});
@@ -1974,13 +2043,18 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
   try{
     const sid='p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
     const pRef=fbDb.ref('presence/'+sid);
-    const beat=()=>pRef.set({t:Date.now()}).catch(()=>{});
+    const myPresenceName=()=>currentUser?((currentUser.displayName)||(currentUser.email||'').split('@')[0]||null):null;
+    const beat=()=>pRef.set({t:Date.now(),name:myPresenceName()}).catch(()=>{});
     fbDb.ref('.info/connected').on('value',s=>{ if(s.val()===true){ pRef.onDisconnect().remove(); beat(); } });
     setInterval(beat,25000);
+    window.__beatPresence=beat; // re-beat with name right after login
     fbDb.ref('presence').on('value',snap=>{
-      const d=snap.val()||{}, now=Date.now(); let n=0;
-      Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000) n++; });
+      const d=snap.val()||{}, now=Date.now(); let n=0; const names=[];
+      Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000){ n++; if(v.name&&names.indexOf(v.name)<0) names.push(v.name); } });
       document.querySelectorAll('.jsOnline').forEach(el=>el.innerHTML=`🟢 <b>${n}</b> online now`);
+      window.__onlineNames=names;
+      const co=document.getElementById('chatOnline');
+      if(co) co.innerHTML = names.length?`🟢 Online: <b>${names.map(esc).join(', ')}</b>`:`🟢 No family members online right now`;
     },err=>{/* presence rule not published yet */});
   }catch(e){}
 })();
