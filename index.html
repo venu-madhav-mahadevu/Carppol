@@ -393,7 +393,10 @@
     box-shadow:0 4px 10px -4px var(--ac,#4F46E5);color:#fff;}
   .alert .abody{min-width:0;}
   .alert .atitle{font-size:13px;font-weight:700;line-height:1.2;color:var(--ink);}
-  .alert .atext{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.35;}
+  .alert .adate{display:inline-block;font-size:10.5px;font-weight:700;color:var(--ac,#4F46E5);
+    background:var(--holiday);border-radius:20px;padding:2px 8px;margin-top:3px;
+    font-variant-numeric:tabular-nums;}
+  .alert .atext{font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.35;}
   .alert .aclose{position:absolute;top:7px;right:8px;width:20px;height:20px;border:none;
     background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;
     border-radius:6px;display:flex;align-items:center;justify-content:center;padding:0;}
@@ -803,13 +806,13 @@ function collectAlerts(){
   const td=(TODAY>=FIRST&&TODAY<=LAST)?driverForDate(TODAY):null;
   if(td){
     const early=EARLY.has(TODAY);
-    list.push({icon:'🚗',color:AC[PCLASS[td]],
+    list.push({icon:'🚗',color:AC[PCLASS[td]],date:fmtDay(TODAY),
       title:`${td} drives today`,
       text:early?'Leave 7:30 AM · early pickup 12:45 PM':'Leave 7:30 AM · pickup 2:00 PM'});
   }else{
     let scan=TODAY<FIRST?FIRST:addDays(TODAY,1),nd=null;
     for(let i=0;i<200&&scan<=LAST;i++){if(driverForDate(scan)){nd=scan;break;}scan=addDays(scan,1);}
-    if(nd) list.push({icon:'📅',color:AC.info,title:'No school today',
+    if(nd) list.push({icon:'📅',color:AC.info,date:fmtDay(TODAY),title:'No school today',
       text:`Next up: ${driverForDate(nd)} · ${fmtDay(nd)}`});
   }
   // 2) Upcoming minimum day within 8 days (incl. today if not already the driver note)
@@ -817,8 +820,8 @@ function collectAlerts(){
   for(let i=0;i<9;i++){
     if(mScan>LAST) break;
     if(EARLY.has(mScan)&&driverForDate(mScan)&&!(mScan===TODAY)){
-      list.push({icon:'⏰',color:AC.amber,title:`Minimum day ${relDay(mScan)}`,
-        text:`Early pickup 12:45 PM · ${fmtDay(mScan)}`});
+      list.push({icon:'⏰',color:AC.amber,date:fmtDay(mScan),title:`Minimum day ${relDay(mScan)}`,
+        text:'Early pickup 12:45 PM'});
       break;
     }
     mScan=addDays(mScan,1);
@@ -829,8 +832,8 @@ function collectAlerts(){
     if(hScan>LAST) break;
     const wd=new Date(...hScan.split('-').map((v,x)=>x===1?v-1:+v)).getDay();
     if(wd!==0&&wd!==6&&NO_SCHOOL[hScan]){
-      list.push({icon:'🏖️',color:AC.ok,title:`No school ${relDay(hScan)}`,
-        text:`${NO_SCHOOL[hScan]} · ${fmtDay(hScan)}`});
+      list.push({icon:'🏖️',color:AC.ok,date:fmtDay(hScan),title:`No school ${relDay(hScan)}`,
+        text:NO_SCHOOL[hScan]});
       break;
     }
     hScan=addDays(hScan,1);
@@ -843,7 +846,9 @@ function showAlert(a,delay){
   el.style.setProperty('--ac',a.color);
   el.style.animationDelay=delay+'s';
   el.innerHTML=`<div class="aicon">${a.icon}</div>`+
-    `<div class="abody"><div class="atitle">${a.title}</div><div class="atext">${a.text}</div></div>`+
+    `<div class="abody"><div class="atitle">${a.title}</div>`+
+    (a.date?`<div class="adate">📅 ${a.date}</div>`:'')+
+    `<div class="atext">${a.text}</div></div>`+
     `<button class="aclose" aria-label="Dismiss">×</button>`;
   const close=()=>{el.classList.add('out');setTimeout(()=>el.remove(),350);};
   el.querySelector('.aclose').addEventListener('click',close);
