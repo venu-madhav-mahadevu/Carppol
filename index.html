@@ -138,6 +138,11 @@
     letter-spacing:.06em;color:rgba(255,255,255,.85);}
   footer{margin-top:6px;font-size:12px;color:var(--muted);text-align:center;line-height:1.6;}
   footer b{color:var(--sub);font-weight:600;}
+  .visitcount{margin-top:11px;display:inline-flex;gap:7px;align-items:center;font-size:12px;
+    color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:5px 13px;box-shadow:0 1px 2px rgba(16,24,40,.04);font-variant-numeric:tabular-nums;}
+  .visitcount b{color:var(--ink);font-weight:700;}
+  .visitcount:empty{display:none;}
 
   /* Toolbar */
   .toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px;flex-wrap:wrap;}
@@ -542,6 +547,7 @@
   <footer>
     <b>Mon–Thu</b> fixed · <b>Fri</b> rotates one per school week.<br>
     Can’t drive your day? Arrange a swap with the group.
+    <div class="visitcount" id="visitCount"></div>
   </footer>
 </div>
 
@@ -1636,6 +1642,28 @@ document.getElementById('cal').addEventListener('click',e=>{
   const c=e.target.closest('.cell[data-date]'); if(!c) return;
   openLog(c.dataset.date);
 });
+
+// ---- Visitor counter (public /stats) ----
+(function visitorCounter(){
+  if(!fbOK) return;
+  try{
+    // total page views
+    fbDb.ref('stats/visits').transaction(v=>(v||0)+1).catch(()=>{});
+    // unique visitors (once per browser)
+    let vid=null; try{vid=localStorage.getItem('carpool-vid');}catch(e){}
+    if(!vid){
+      vid='v'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+      try{localStorage.setItem('carpool-vid',vid);}catch(e){}
+      fbDb.ref('stats/unique').transaction(v=>(v||0)+1).catch(()=>{});
+    }
+    // live display
+    fbDb.ref('stats').on('value',snap=>{
+      const s=snap.val()||{}; const el=document.getElementById('visitCount'); if(!el) return;
+      const v=(s.visits||0).toLocaleString(), u=(s.unique||0).toLocaleString();
+      el.innerHTML=`👀 <b>${v}</b> visits · <b>${u}</b> visitors`;
+    },err=>{/* stats rule not published yet */});
+  }catch(e){}
+})();
 
 // ---- Private kid photos (only visible to signed-in families) ----
 function riderByName(name){return [...document.querySelectorAll('.rider')].find(r=>{const n=r.querySelector('.rname');return n&&n.textContent.trim()===name;});}
