@@ -478,6 +478,10 @@
     <h1>School Carpool</h1>
     <div class="sub">Leave home 7:30 AM · pickup 2:00 PM · same helper both ways</div>
     <div class="rotnote"><b>Fridays rotate</b> one per week: Venu → Shiva → Charan → Kumar. If a Friday is a holiday, it doesn’t skip anyone — the next school Friday continues with the next person. Cells show a small “FRI” tag, colored by whose turn it is.</div>
+    <div class="stats-row" style="justify-content:flex-start;margin-top:10px">
+      <div class="visitcount jsVisits"></div>
+      <div class="visitcount onlinenow jsOnline"></div>
+    </div>
   </header>
 
   <div class="toolbar">
@@ -552,8 +556,8 @@
     <b>Mon–Thu</b> fixed · <b>Fri</b> rotates one per school week.<br>
     Can’t drive your day? Arrange a swap with the group.
     <div class="stats-row">
-      <div class="visitcount" id="visitCount"></div>
-      <div class="visitcount onlinenow" id="onlineNow"></div>
+      <div class="visitcount jsVisits"></div>
+      <div class="visitcount onlinenow jsOnline"></div>
     </div>
   </footer>
 </div>
@@ -1665,9 +1669,9 @@ document.getElementById('cal').addEventListener('click',e=>{
     }
     // live display
     fbDb.ref('stats').on('value',snap=>{
-      const s=snap.val()||{}; const el=document.getElementById('visitCount'); if(!el) return;
+      const s=snap.val()||{};
       const v=(s.visits||0).toLocaleString(), u=(s.unique||0).toLocaleString();
-      el.innerHTML=`👀 <b>${v}</b> visits · <b>${u}</b> visitors`;
+      document.querySelectorAll('.jsVisits').forEach(el=>el.innerHTML=`👀 <b>${v}</b> visits · <b>${u}</b> visitors`);
     },err=>{/* stats rule not published yet */});
   }catch(e){}
 })();
@@ -1684,8 +1688,7 @@ document.getElementById('cal').addEventListener('click',e=>{
     fbDb.ref('presence').on('value',snap=>{
       const d=snap.val()||{}, now=Date.now(); let n=0;
       Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000) n++; });
-      const el=document.getElementById('onlineNow'); if(!el) return;
-      el.innerHTML=`🟢 <b>${n}</b> online now`;
+      document.querySelectorAll('.jsOnline').forEach(el=>el.innerHTML=`🟢 <b>${n}</b> online now`);
     },err=>{/* presence rule not published yet */});
   }catch(e){}
 })();
