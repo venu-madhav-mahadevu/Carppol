@@ -1198,6 +1198,10 @@ let myTrack=[], sessionId=null, trailLine=null, sessionRef=null;
     }
   }catch(e){console.warn('Firebase init failed:',e);}
 })();
+// Staging isolation: the /staging/ build reads & writes under a separate "stg/" subtree,
+// so testing never touches production data. (.info/* paths must NOT be prefixed.)
+const DB_PREFIX = (location.pathname.indexOf('/staging/')>=0) ? 'stg/' : '';
+function dref(p){ return fbDb.ref(DB_PREFIX+p); }
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -1317,7 +1321,7 @@ function initMap(){
   setTimeout(()=>map&&map.invalidateSize(),120);
 }
 function listenLocations(){
-  locRef=fbDb.ref('locations');
+  locRef=dref('locations');
   locRef.on('value',snap=>{
     const data=snap.val()||{};
     const now=Date.now(), fresh={};
@@ -1428,11 +1432,11 @@ function startSharing(){
   const btn=liveModal.querySelector('#liveToggle');
   btn.textContent='⏸️ Stop sharing'; btn.classList.add('stop');
   liveModal.querySelector('#geoText').textContent='Locating…';
-  const myRef=fbDb.ref('locations/'+currentUser.uid);
+  const myRef=dref('locations/'+currentUser.uid);
   myRef.onDisconnect().remove();
   // begin a recording session
   sessionId=Date.now(); myTrack=[];
-  sessionRef=fbDb.ref('tracks/'+currentUser.uid+'/'+sessionId);
+  sessionRef=dref('tracks/'+currentUser.uid+'/'+sessionId);
   sessionRef.child('meta').set({name:myName,start:sessionId});
   watchId=navigator.geolocation.watchPosition(pos=>{
     const {latitude:lat,longitude:lng,accuracy:ac}=pos.coords;
@@ -1451,7 +1455,7 @@ function startSharing(){
 }
 function stopSharing(){
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
-  if(fbDb&&currentUser){fbDb.ref('locations/'+currentUser.uid).remove();}
+  if(fbDb&&currentUser){dref('locations/'+currentUser.uid).remove();}
   if(sessionRef){sessionRef.child('meta/end').set(Date.now());sessionRef=null;} // close recording
   const btn=liveModal.querySelector('#liveToggle');
   if(btn){btn.textContent='▶️ Share my live location';btn.classList.remove('stop');}
@@ -1543,7 +1547,7 @@ function initWhereMap(){
   setTimeout(()=>whereMap&&whereMap.invalidateSize(),120);
 }
 function listenWhere(){
-  whereRef=fbDb.ref('locations');
+  whereRef=dref('locations');
   whereRef.on('value',snap=>{
     const data=snap.val()||{}, now=Date.now();
     // pick the most-recent fresh sharer = the active car
@@ -1630,7 +1634,7 @@ function renderLog(dateStr){
   cleanupRouteMap();
   const list=logModal.querySelector('#logList');
   if(list) list.innerHTML=`<div class="where-empty">Loading…</div>`;
-  fbDb.ref('tracks').once('value').then(snap=>{
+  dref('tracks').once('value').then(snap=>{
     const data=snap.val()||{}, rows=[];
     Object.entries(data).forEach(([uid,sessions])=>{
       Object.entries(sessions||{}).forEach(([sid,sess])=>{
@@ -1680,7 +1684,7 @@ function showTrackRoute(r){
       `<div class="uprog" id="uProg"><span></span></div></div>`+
     `<div id="routeMsg" class="ltime" style="text-align:center;margin-top:8px">Loading route…</div>`;
   list.querySelector('#logBack').addEventListener('click',()=>renderLog(logDateSel));
-  fbDb.ref('tracks/'+r.uid+'/'+r.sid+'/points').once('value').then(snap=>{
+  dref('tracks/'+r.uid+'/'+r.sid+'/points').once('value').then(snap=>{
     const pts=[],tss=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&typeof v.lat==='number'){pts.push([v.lat,v.lng]);tss.push(v.ts||0);}});
     const msg=logModal.querySelector('#routeMsg');
     if(!window.L){ if(msg) msg.textContent='Map library not loaded.'; return; }
@@ -1802,18 +1806,18 @@ function postSwap(){
   const note=swapModal.querySelector('#swNote').value.trim();
   if(!date){return;}
   const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
-  fbDb.ref('swaps').push({date,slot,note,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
+  dref('swaps').push({date,slot,note,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
     .then(()=>{swapModal.querySelector('#swNote').value='';})
     .catch(err=>alert('Could not post: '+(err.message||'')));
 }
 function claimSwap(id,s){
   const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
-  fbDb.ref('swaps/'+id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverTs:Date.now()})
+  dref('swaps/'+id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverTs:Date.now()})
     .catch(err=>alert('Could not cover: '+(err.message||'')));
 }
-function cancelSwap(id){ fbDb.ref('swaps/'+id).remove().catch(()=>{}); }
+function cancelSwap(id){ dref('swaps/'+id).remove().catch(()=>{}); }
 function listenSwaps(){
-  swapsRef=fbDb.ref('swaps');
+  swapsRef=dref('swaps');
   swapsRef.on('value',snap=>{
     const data=snap.val()||{}, today=localDateStr(Date.now());
     const rows=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
@@ -1887,7 +1891,7 @@ function watchUnread(){
   fbAuth.onAuthStateChanged(u=>{
     if(u){
       if(!unreadRef){
-        unreadRef=fbDb.ref('messages').limitToLast(50);
+        unreadRef=dref('messages').limitToLast(50);
         unreadRef.on('value',snap=>{
           let latest=0, unread=0;
           snap.forEach(ch=>{const v=ch.val(); if(!v||!v.ts) return; latest=Math.max(latest,v.ts);
@@ -1930,7 +1934,7 @@ function openChat(){
 }
 function timeShort(ts){ if(!ts)return''; return new Date(ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
 function listenMsgs(){
-  msgsRef=fbDb.ref('messages').limitToLast(200);
+  msgsRef=dref('messages').limitToLast(200);
   msgsRef.on('value',snap=>{
     const list=chatModal.querySelector('#chatList'); if(!list) return;
     const rows=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&v.text) rows.push(v);});
@@ -1950,7 +1954,7 @@ function sendMsg(){
   const inp=chatModal.querySelector('#chatInput'); if(!inp) return;
   const text=inp.value.trim(); if(!text) return;
   inp.value='';
-  fbDb.ref('messages').push({text,by:currentUser.uid,byName:chatMyName(),ts:Date.now()})
+  dref('messages').push({text,by:currentUser.uid,byName:chatMyName(),ts:Date.now()})
     .catch(err=>alert('Could not send: '+(err.message||'')));
 }
 function closeChat(){ chatOpen=false; if(msgsRef){msgsRef.off();msgsRef=null;} chatOverlay.classList.remove('open'); }
@@ -1978,7 +1982,7 @@ function openStats(){
   // trip stats from recorded tracks (signed-in only)
   if(fbOK&&currentUser){
     const ts=statsModal.querySelector('#tripStats'); ts.textContent='Loading recorded trips…';
-    fbDb.ref('tracks').once('value').then(snap=>{
+    dref('tracks').once('value').then(snap=>{
       const data=snap.val()||{}; const perName={}; let trips=0, ms=0;
       Object.values(data).forEach(sessions=>Object.values(sessions||{}).forEach(sess=>{
         const m=sess&&sess.meta; if(!m||!m.start)return; trips++;
@@ -2017,16 +2021,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
   if(!fbOK) return;
   try{
     // total page views
-    fbDb.ref('stats/visits').transaction(v=>(v||0)+1).catch(()=>{});
+    dref('stats/visits').transaction(v=>(v||0)+1).catch(()=>{});
     // unique visitors (once per browser)
     let vid=null; try{vid=localStorage.getItem('carpool-vid');}catch(e){}
     if(!vid){
       vid='v'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
       try{localStorage.setItem('carpool-vid',vid);}catch(e){}
-      fbDb.ref('stats/unique').transaction(v=>(v||0)+1).catch(()=>{});
+      dref('stats/unique').transaction(v=>(v||0)+1).catch(()=>{});
     }
     // live display
-    fbDb.ref('stats').on('value',snap=>{
+    dref('stats').on('value',snap=>{
       const s=snap.val()||{};
       const v=(s.visits||0).toLocaleString(), u=(s.unique||0).toLocaleString();
       document.querySelectorAll('.jsVisits').forEach(el=>el.innerHTML=`👀 <b>${v}</b> visits · <b>${u}</b> visitors`);
@@ -2039,13 +2043,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
   if(!fbOK) return;
   try{
     const sid='p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-    const pRef=fbDb.ref('presence/'+sid);
+    const pRef=dref('presence/'+sid);
     const myPresenceName=()=>currentUser?((currentUser.displayName)||(currentUser.email||'').split('@')[0]||null):null;
     const beat=()=>pRef.set({t:Date.now(),name:myPresenceName()}).catch(()=>{});
     fbDb.ref('.info/connected').on('value',s=>{ if(s.val()===true){ pRef.onDisconnect().remove(); beat(); } });
     setInterval(beat,25000);
     window.__beatPresence=beat; // re-beat with name right after login
-    fbDb.ref('presence').on('value',snap=>{
+    dref('presence').on('value',snap=>{
       const d=snap.val()||{}, now=Date.now(); let n=0; const names=[];
       Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000){ n++; if(v.name&&names.indexOf(v.name)<0) names.push(v.name); } });
       document.querySelectorAll('.jsOnline').forEach(el=>el.innerHTML=`🟢 <b>${n}</b> online now`);
@@ -2091,7 +2095,7 @@ function onKidPhotoPick(name,ev,btn){
     const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;
     cv.getContext('2d').drawImage(img,0,0,cw,ch);
     const uri=cv.toDataURL('image/jpeg',0.82);
-    fbDb.ref('kids/'+name).set({photo:uri,by:currentUser?currentUser.uid:null,ts:Date.now()})
+    dref('kids/'+name).set({photo:uri,by:currentUser?currentUser.uid:null,ts:Date.now()})
       .then(()=>{if(btn)btn.textContent='📷';})
       .catch(err=>{if(btn)btn.textContent='📷';alert('Could not save photo: '+(err.message||''));});
   };img.onerror=()=>{if(btn)btn.textContent='📷';alert('That image could not be read.');};img.src=rd.result;};
@@ -2103,7 +2107,7 @@ if(fbOK){
     if(u){
       setKidEditMode(true);
       if(!kidsRef){
-        kidsRef=fbDb.ref('kids');
+        kidsRef=dref('kids');
         kidsRef.on('value',snap=>{const data=snap.val()||{};
           document.querySelectorAll('.rider').forEach(r=>{const n=r.querySelector('.rname');if(!n)return;
             const nm=n.textContent.trim();applyKidPhoto(nm,(data[nm]&&data[nm].photo)||null);});
