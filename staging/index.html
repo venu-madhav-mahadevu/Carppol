@@ -271,6 +271,11 @@
     cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;
     box-shadow:0 2px 6px -3px rgba(16,24,40,.4);}
   .rider .kphoto-btn:hover{border-color:var(--venu);}
+  .rider .kdob-btn{position:absolute;top:6px;right:34px;width:24px;height:24px;border-radius:8px;
+    border:1px solid var(--line);background:var(--card);font-size:12px;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;
+    box-shadow:0 2px 6px -3px rgba(16,24,40,.4);}
+  .rider .kdob-btn:hover{border-color:var(--charan);}
   .cell.bday{box-shadow:inset 0 0 0 2px #DB2777;}
   .cell .bday-flag{position:absolute;top:2px;left:3px;font-size:9px;line-height:1;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.25));}
@@ -842,31 +847,34 @@ function nextBirthdayInfo(b){
   const age=b.year?(d.getFullYear()-b.year):null;
   return {iso,days,age,label:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})};
 }
-// show birthday date (+ photo) on each Kids card
-document.querySelectorAll('.rider').forEach(r=>{
-  const nameEl=r.querySelector('.rname'); if(!nameEl) return;
-  const name=nameEl.textContent.trim();
-  const b=BIRTHDAYS[name]; const info=nextBirthdayInfo(b);
+// show birthday date on one Kids card (re-runnable when DOB changes)
+function renderKidBirthday(name){
+  const r=[...document.querySelectorAll('.rider')].find(x=>{const n=x.querySelector('.rname');return n&&n.textContent.trim()===name;});
+  if(!r) return;
+  const old=r.querySelector('.rbday'); if(old) old.remove();
+  const info=nextBirthdayInfo(BIRTHDAYS[name]);
   if(info){
     const line=document.createElement('div'); line.className='rbday';
     line.innerHTML=`🎂 ${info.label}${info.age?` · turns ${info.age}`:''}`;
     (r.querySelector('.rtxt')||r).appendChild(line);
   }
-  if(b&&b.photo){
-    const av=r.querySelector('.av');
-    if(av){av.style.backgroundImage=`url('${b.photo}')`;av.classList.add('photo');av.textContent='';}
-  }
-});
-// birthday badge on the calendar date
-document.querySelectorAll('.cell[data-date]').forEach(c=>{
-  const [Y,M,D]=c.dataset.date.split('-').map(Number);
-  for(const nm in BIRTHDAYS){const b=BIRTHDAYS[nm];
-    if(b&&b.month===M&&b.day===D){
-      c.classList.add('bday'); c.title=`🎂 ${nm}'s birthday`;
-      const f=document.createElement('span'); f.className='bday-flag'; f.textContent='🎂';
-      c.appendChild(f); break;
-    }}
-});
+}
+// birthday badges on calendar dates (re-runnable)
+function renderBdayBadges(){
+  document.querySelectorAll('.cell.bday').forEach(c=>{ c.classList.remove('bday'); c.removeAttribute('title');
+    const f=c.querySelector('.bday-flag'); if(f) f.remove(); });
+  document.querySelectorAll('.cell[data-date]').forEach(c=>{
+    const [Y,M,D]=c.dataset.date.split('-').map(Number);
+    for(const nm in BIRTHDAYS){const b=BIRTHDAYS[nm];
+      if(b&&b.month===M&&b.day===D){
+        c.classList.add('bday'); c.title=`🎂 ${nm}'s birthday`;
+        const f=document.createElement('span'); f.className='bday-flag'; f.textContent='🎂';
+        c.appendChild(f); break;
+      }}
+  });
+}
+KIDS.forEach(k=>renderKidBirthday(k.name));
+renderBdayBadges();
 
 // ---- Person filter (tap legend chip) ----
 let activeFilter=null;
@@ -1998,23 +2006,30 @@ document.getElementById('statsBtn').addEventListener('click',openStats);
 statsOverlay.addEventListener('click',e=>{if(e.target===statsOverlay)closeStats();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
 
-// ---- Countdown chip (next break / next birthday) ----
-(function countdown(){
+// ---- Countdown chip (next break / next birthday) — re-runnable ----
+function renderCountdown(){
   const host=document.querySelector('header.top .stats-row'); if(!host) return;
-  // next multi-day break start
+  const existing=document.getElementById('countRow'); if(existing) existing.remove();
   const brDates=Object.keys(NO_SCHOOL).sort();
   let nextBreak=null;
   for(const d of brDates){ if(d>=TODAY){ nextBreak={date:d,label:NO_SCHOOL[d]}; break; } }
-  // next birthday
   let nextBd=null;
   for(const nm in BIRTHDAYS){ const info=nextBirthdayInfo(BIRTHDAYS[nm]); if(info&&(!nextBd||info.days<nextBd.days)) nextBd={name:nm,...info}; }
   const chips=[];
   if(nextBreak){ const dd=daysAway(nextBreak.date);
     if(dd>=0&&dd<=60) chips.push(`<span class="countchip"><span class="cc-em">🏖️</span> <b>${dd}</b> day${dd===1?'':'s'} to ${esc(nextBreak.label)}</span>`); }
   if(nextBd&&nextBd.days<=90) chips.push(`<span class="countchip"><span class="cc-em">🎂</span> <b>${nextBd.days}</b> day${nextBd.days===1?'':'s'} to ${esc(nextBd.name)}’s birthday</span>`);
-  if(chips.length){ const wrap=document.createElement('div'); wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%';
+  if(chips.length){ const wrap=document.createElement('div'); wrap.id='countRow'; wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%';
     wrap.innerHTML=chips.join(''); host.parentNode.insertBefore(wrap,host.nextSibling); }
-})();
+}
+renderCountdown();
+// apply a DOB coming from the database and refresh everything that depends on it
+function updateKidBirthday(name,dob){
+  if(!BIRTHDAYS[name]) return;
+  BIRTHDAYS[name]={month:dob&&dob.month||0, day:dob&&dob.day||0, year:(dob&&dob.year)||null, photo:BIRTHDAYS[name].photo||''};
+  renderKidBirthday(name); renderBdayBadges(); renderCountdown();
+  if(typeof runAlerts==='function') runAlerts();
+}
 
 // ---- Visitor counter (public /stats) ----
 (function visitorCounter(){
@@ -2072,6 +2087,7 @@ function setKidEditMode(on){
     const nameEl=r.querySelector('.rname'); if(!nameEl) return;
     const name=nameEl.textContent.trim();
     let btn=r.querySelector('.kphoto-btn');
+    let dbtn=r.querySelector('.kdob-btn');
     if(on){
       if(!btn){
         btn=document.createElement('button');btn.className='kphoto-btn';btn.type='button';
@@ -2082,8 +2098,29 @@ function setKidEditMode(on){
         input.addEventListener('change',ev=>onKidPhotoPick(name,ev,btn));
         r.appendChild(btn);r.appendChild(input);
       }
-    }else if(btn){btn.remove();const inp=r.querySelector('.kphoto-input');if(inp)inp.remove();}
+      if(!dbtn){
+        dbtn=document.createElement('button');dbtn.className='kdob-btn';dbtn.type='button';
+        dbtn.title='Set birthday';dbtn.textContent='🎂';
+        const dinput=document.createElement('input');dinput.type='date';dinput.className='kdob-input';dinput.style.display='none';
+        const b=BIRTHDAYS[name]; if(b&&b.month&&b.day){ const y=b.year||2016;
+          dinput.value=`${y}-${String(b.month).padStart(2,'0')}-${String(b.day).padStart(2,'0')}`; }
+        dbtn.addEventListener('click',()=>{ try{ dinput.showPicker?dinput.showPicker():dinput.click(); }catch(e){ dinput.click(); } });
+        dinput.addEventListener('change',ev=>onKidDobPick(name,ev,dbtn));
+        r.appendChild(dbtn);r.appendChild(dinput);
+      }
+    }else{
+      if(btn){btn.remove();const inp=r.querySelector('.kphoto-input');if(inp)inp.remove();}
+      if(dbtn){dbtn.remove();const di=r.querySelector('.kdob-input');if(di)di.remove();}
+    }
   });
+}
+function onKidDobPick(name,ev,btn){
+  const val=ev.target.value; if(!val) return;           // YYYY-MM-DD
+  const [y,m,d]=val.split('-').map(Number); if(!m||!d) return;
+  if(btn) btn.textContent='…';
+  dref('kids/'+name).update({dob:{month:m,day:d,year:y||null},dobBy:currentUser?currentUser.uid:null,dobTs:Date.now()})
+    .then(()=>{if(btn)btn.textContent='🎂';})
+    .catch(err=>{if(btn)btn.textContent='🎂';alert('Could not save birthday: '+(err.message||''));});
 }
 function onKidPhotoPick(name,ev,btn){
   const file=ev.target.files&&ev.target.files[0]; if(!file) return;
@@ -2095,7 +2132,7 @@ function onKidPhotoPick(name,ev,btn){
     const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;
     cv.getContext('2d').drawImage(img,0,0,cw,ch);
     const uri=cv.toDataURL('image/jpeg',0.82);
-    dref('kids/'+name).set({photo:uri,by:currentUser?currentUser.uid:null,ts:Date.now()})
+    dref('kids/'+name).update({photo:uri,photoBy:currentUser?currentUser.uid:null,photoTs:Date.now()})
       .then(()=>{if(btn)btn.textContent='📷';})
       .catch(err=>{if(btn)btn.textContent='📷';alert('Could not save photo: '+(err.message||''));});
   };img.onerror=()=>{if(btn)btn.textContent='📷';alert('That image could not be read.');};img.src=rd.result;};
@@ -2108,9 +2145,15 @@ if(fbOK){
       setKidEditMode(true);
       if(!kidsRef){
         kidsRef=dref('kids');
-        kidsRef.on('value',snap=>{const data=snap.val()||{};
+        kidsRef.on('value',snap=>{const data=snap.val()||{}; let dobChanged=false;
           document.querySelectorAll('.rider').forEach(r=>{const n=r.querySelector('.rname');if(!n)return;
-            const nm=n.textContent.trim();applyKidPhoto(nm,(data[nm]&&data[nm].photo)||null);});
+            const nm=n.textContent.trim();
+            applyKidPhoto(nm,(data[nm]&&data[nm].photo)||null);
+            const dob=data[nm]&&data[nm].dob;
+            if(dob&&BIRTHDAYS[nm]){ BIRTHDAYS[nm]={month:dob.month||0,day:dob.day||0,year:dob.year||null,photo:''};
+              renderKidBirthday(nm); dobChanged=true; }
+          });
+          if(dobChanged){ renderBdayBadges(); renderCountdown(); if(typeof runAlerts==='function') runAlerts(); }
           // feed the falling-flowers with the private photos (only while signed in)
           kidPhotos=Object.values(data).map(v=>v&&v.photo).filter(Boolean);
           refreshPetals();
