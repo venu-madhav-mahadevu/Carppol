@@ -247,6 +247,7 @@
   .rider .rwith{font-size:11px;color:var(--sub);font-weight:500;margin-top:2px;}
   .rider .rbday{font-size:11px;font-weight:700;color:#DB2777;margin-top:3px;}
   .rider .av.photo{background-size:cover;background-position:center;color:transparent;cursor:zoom-in;}
+  .rider .av.photo .av-init{opacity:0;}
   /* photo petals */
   .petal.petal-img{border-radius:50%;background-size:cover;background-position:center;
     border:2px solid rgba(255,255,255,.92);box-shadow:0 2px 7px rgba(16,24,40,.28);}
@@ -622,24 +623,7 @@
   <div class="riders">
     <h2>🎒 Our Carpool Kids</h2>
     <div class="rcaption">Four riders, one carpool — whoever drives that day takes the whole crew.</div>
-    <div class="rider-grid">
-      <div class="rider" style="--rg:linear-gradient(150deg,#A78BFA,#6D28D9);--rc:#7C3AED">
-        <div class="av">K<span class="spark">🌟</span></div>
-        <div class="rtxt"><div class="rname">Kundana</div></div>
-      </div>
-      <div class="rider" style="--rg:linear-gradient(150deg,#F472B6,#BE185D);--rc:#DB2777">
-        <div class="av">K<span class="spark">🌸</span></div>
-        <div class="rtxt"><div class="rname">Krupa</div></div>
-      </div>
-      <div class="rider" style="--rg:linear-gradient(150deg,#22D3EE,#0E7490);--rc:#0891B2">
-        <div class="av">I<span class="spark">🦋</span></div>
-        <div class="rtxt"><div class="rname">Ishanvi</div></div>
-      </div>
-      <div class="rider" style="--rg:linear-gradient(150deg,#FBBF24,#D97706);--rc:#EA580C">
-        <div class="av">S<span class="spark">🌈</span></div>
-        <div class="rtxt"><div class="rname">Srinidhi</div></div>
-      </div>
-    </div>
+    <div class="rider-grid" id="riderGrid"></div>
   </div>
 
   <div class="legend" id="legend">
@@ -687,14 +671,27 @@ const RECORD_WINDOWS = {
   minDayAfternoon: { start:'12:00', end:'13:00', label:'Afternoon (minimum day)' }
 };
 
-/* ===== EDIT HERE: kids' birthdays. month = 1-12, day = 1-31. year optional (shows age).
-   photo optional: a file you add to the repo (e.g. 'kundana.jpg') or a data: URI. */
-const BIRTHDAYS = {
-  'Kundana':    { month:11, day:10, year:null, photo:'' },
-  'Krupa':      { month:0,  day:0,  year:null, photo:'' },
-  'Ishanvi':    { month:0,  day:0,  year:null, photo:'' },
-  'Srinidhi': { month:7,  day:17, year:null, photo:'' }
-};
+/* ===== EDIT HERE: the carpool kids — one place for name, colors, birthday.
+   To rename a kid, add one, or set a birthday, edit ONLY this list.
+   birthday: month 1-12, day 1-31 (0/0 = unknown); year optional (shows age). */
+const KIDS = [
+  { name:'Kundana', spark:'🌟', from:'#A78BFA', to:'#6D28D9', accent:'#7C3AED', birthday:{month:11, day:10, year:null} },
+  { name:'Krupa',   spark:'🌸', from:'#F472B6', to:'#BE185D', accent:'#DB2777', birthday:{month:0,  day:0,  year:null} },
+  { name:'Ishanvi', spark:'🦋', from:'#22D3EE', to:'#0E7490', accent:'#0891B2', birthday:{month:0,  day:0,  year:null} },
+  { name:'Srinidhi',spark:'🌈', from:'#FBBF24', to:'#D97706', accent:'#EA580C', birthday:{month:7,  day:17, year:null} }
+];
+// derived: birthdays keyed by name (used by alerts / countdown / calendar) — do not edit
+const BIRTHDAYS = Object.fromEntries(KIDS.map(k=>[k.name,{...k.birthday,photo:''}]));
+// build the "Our Carpool Kids" card from the KIDS config
+(function renderKids(){
+  const grid=document.getElementById('riderGrid'); if(!grid) return;
+  grid.innerHTML=KIDS.map(k=>{
+    const initial=(k.name.trim()[0]||'?');
+    return `<div class="rider" style="--rg:linear-gradient(150deg,${k.from},${k.to});--rc:${k.accent}">`+
+      `<div class="av"><span class="av-init">${initial}</span><span class="spark">${k.spark}</span></div>`+
+      `<div class="rtxt"><div class="rname">${k.name}</div></div></div>`;
+  }).join('');
+})();
 
 /* ===== EDIT HERE: paste your Firebase project config (Console → Project settings → Web app)
    These values are safe to be public. Live tracking stays disabled until apiKey is filled. */
@@ -2063,9 +2060,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
 function riderByName(name){return [...document.querySelectorAll('.rider')].find(r=>{const n=r.querySelector('.rname');return n&&n.textContent.trim()===name;});}
 function applyKidPhoto(name,uri){
   const r=riderByName(name); if(!r) return; const av=r.querySelector('.av'); if(!av) return;
-  if(!av.dataset.initial) av.dataset.initial=av.textContent;
-  if(uri){av.style.backgroundImage=`url('${uri}')`;av.classList.add('photo');av.textContent='';r.dataset.photo=uri;}
-  else{av.style.backgroundImage='';av.classList.remove('photo');av.textContent=av.dataset.initial;delete r.dataset.photo;}
+  if(uri){av.style.backgroundImage=`url('${uri}')`;av.classList.add('photo');r.dataset.photo=uri;}
+  else{av.style.backgroundImage='';av.classList.remove('photo');delete r.dataset.photo;}
 }
 function setKidEditMode(on){
   document.querySelectorAll('.rider').forEach(r=>{
