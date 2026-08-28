@@ -589,6 +589,7 @@
     <button class="btn" id="statsBtn" type="button">📊 Stats</button>
     <button class="btn" id="chatBtn" type="button">💬 Chat</button>
     <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
+    <a class="btn" id="adminBtn" href="admin.html">⚙️ Admin</a>
     <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
   </div>
 
@@ -1924,6 +1925,17 @@ function closeSwaps(){ if(swapsRef){swapsRef.off();swapsRef=null;} swapOverlay.c
 document.getElementById('swapBtn').addEventListener('click',openSwaps);
 swapOverlay.addEventListener('click',e=>{if(e.target===swapOverlay)closeSwaps();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
+
+// ---- Admin-configurable header (live from DB /config/header) ----
+(function loadHeaderConfig(){
+  if(!fbOK) return;
+  DB.on('config/header', cfg=>{
+    if(!cfg) return;
+    if(cfg.org!=null){ const e=document.querySelector('.eyebrow'); if(e) e.textContent=cfg.org; }
+    if(cfg.title!=null){ const h=document.querySelector('h1'); if(h) h.textContent=cfg.title; if(cfg.title) document.title=cfg.title+' Calendar'; }
+    if(cfg.subtitle!=null){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
+  }, ()=>{});
+})();
 
 // ---- PWA: install to home screen ----
 if('serviceWorker' in navigator){
