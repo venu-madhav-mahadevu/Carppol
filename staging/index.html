@@ -1211,6 +1211,73 @@ let myTrack=[], sessionId=null, trailLine=null, sessionRef=null;
 const DB_PREFIX = (location.pathname.indexOf('/staging/')>=0) ? 'stg/' : '';
 function dref(p){ return fbDb.ref(DB_PREFIX+p); }
 
+/* =====================================================================
+   REUSABLE APP CORE  —  clean API for current features + future Admin page.
+   Everything below is prefix-aware (staging writes under stg/) and safe to
+   reuse anywhere. Prefer these over touching firebase directly.
+   ===================================================================== */
+const DB = {
+  ready:   ()=>fbOK,
+  ref:     (p)=>dref(p),                 // prefixed ref
+  raw:     (p)=>fbDb.ref(p),             // UNprefixed (only for .info/*)
+  get:     (p)=>dref(p).once('value').then(s=>s.val()),
+  set:     (p,v)=>dref(p).set(v),
+  update:  (p,v)=>dref(p).update(v),
+  push:    (p,v)=>dref(p).push(v),
+  remove:  (p)=>dref(p).remove(),
+  txn:     (p,fn)=>dref(p).transaction(fn),
+  // subscribe to a value; returns an unsubscribe fn
+  on:      (p,cb,err)=>{const r=dref(p); const h=r.on('value',s=>cb(s.val(),s),err); return ()=>r.off('value',h);},
+  // subscribe to a collection as an array of {id,...}; returns unsubscribe
+  onList:  (p,cb,err)=>{const r=dref(p); const h=r.on('value',s=>{const o=s.val()||{}; cb(Object.entries(o).map(([id,v])=>({id,...(v&&typeof v==='object'?v:{value:v})})), s);},err); return ()=>r.off('value',h);},
+  prefix:  ()=>DB_PREFIX
+};
+const Auth = {
+  ready:    ()=>fbOK,
+  user:     ()=>currentUser,
+  signedIn: ()=>!!currentUser,
+  uid:      ()=>currentUser&&currentUser.uid,
+  name:     ()=>currentUser?((currentUser.displayName)||(currentUser.email||'Driver').split('@')[0]):null,
+  onChange: (cb)=>{ if(fbOK) fbAuth.onAuthStateChanged(cb); },
+  signIn:   (email,pw)=>fbAuth.signInWithEmailAndPassword(email,pw),
+  signUp:   (email,pw,name)=>fbAuth.createUserWithEmailAndPassword(email,pw).then(c=>c.user.updateProfile({displayName:name})),
+  signOut:  ()=>fbAuth.signOut()
+};
+// date/format helpers (thin, reference the hoisted utilities)
+const Fmt = {
+  day:  (d)=>fmtDay(d),        // "Monday, Sep 7"
+  rel:  (d)=>relDay(d),        // "today" / "tomorrow" / "on Monday"
+  time: (ts)=>hhmm(ts),        // "7:32 AM"
+  dur:  (ms)=>durText(ms),     // "1h 30m"
+  ago:  (ts)=>agoText(ts),     // "5 min ago"
+  isoToday: ()=>TODAY,
+  addDays: (d,n)=>addDays(d,n),
+  esc:  (s)=>esc(s)
+};
+// generic modal controller for NEW panels (e.g. the Admin page).
+// Reuses the existing .overlay/.modal styles. onClose runs on any close.
+const UI = {
+  esc: (s)=>esc(s),
+  el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; },
+  openModal(overlayId, innerHTML, title, opts={}){
+    const ov=document.getElementById(overlayId); if(!ov) return null;
+    const modal=ov.querySelector('.modal'); if(!modal) return null;
+    modal.innerHTML=`<button class="mclose" type="button" aria-label="Close">×</button>`+(title?`<h2>${title}</h2>`:'')+(innerHTML||'');
+    ov.__onClose=opts.onClose||null;
+    modal.querySelector('.mclose').addEventListener('click',()=>UI.closeModal(overlayId));
+    if(!ov.__wired){ ov.__wired=true;
+      ov.addEventListener('click',e=>{ if(e.target===ov) UI.closeModal(overlayId); });
+    }
+    ov.classList.add('open');
+    return modal;
+  },
+  closeModal(overlayId){
+    const ov=document.getElementById(overlayId); if(!ov) return;
+    ov.classList.remove('open');
+    if(typeof ov.__onClose==='function'){ try{ov.__onClose();}catch(_){} }
+  }
+};
+
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 function routeLive(){
