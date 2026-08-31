@@ -130,8 +130,8 @@ function parseICS(text){
   const evs=[];
   text.split('BEGIN:VEVENT').slice(1).forEach(bl=>{ const b=bl.split('END:VEVENT')[0];
     const sm=(b.match(/^SUMMARY[^:]*:(.+)$/m)||[])[1]||'';
-    const ds=b.match(/DTSTART[^:]*:(\d{8})/), de=b.match(/DTEND[^:]*:(\d{8})/);
-    if(ds) evs.push({s:ds[1], e:de?de[1]:null, sm}); });
+    const ds=b.match(/DTSTART[^:]*:(\d{8})(T(\d{2})(\d{2}))?/), de=b.match(/DTEND[^:]*:(\d{8})/);
+    if(ds) evs.push({s:ds[1], e:de?de[1]:null, sm, timed:!!ds[2], hh:ds[3], mm:ds[4]}); });
   // find the school-year window from first/last day events (fallback: around now)
   let first='', last='';
   evs.forEach(v=>{ if(FIRSTre.test(v.sm)) first=first?first:iso(v.s); if(LASTre.test(v.sm)) last=iso(v.s); });
@@ -143,12 +143,17 @@ function parseICS(text){
     const out=[]; let cur=new Date(sd),g=0; while(cur<ed && g++<40){ out.push(cur.toISOString().slice(0,10)); cur=new Date(cur.getTime()+864e5);} return out; }
   function clean(s){ s=s.replace(/\s*\(.*?\)/,'').trim().replace(/^No School\s*-\s*/i,'').replace(/^No School\s*$/i,'No school');
     if(/Thanksgiving Break/i.test(s)) s='Thanksgiv.'; else if(/Winter Break|Spring Break/i.test(s)) s='Break'; return s.slice(0,12); }
-  const holidays={}, minimum=new Set();
+  const holidays={}, minimum=new Set(), events={};
+  const addEvent=(d,title)=>{ if(!events[d]) events[d]=[]; if(events[d].length<8 && !events[d].some(x=>x.t===title)) events[d].push({t:title}); };
   evs.forEach(v=>{ if(!inr(iso(v.s))) return;
     if(MIN.test(v.sm)) expand(v.s,v.e).forEach(d=>{ if(inr(d)) minimum.add(d); });
     else if(NO.test(v.sm)) expand(v.s,v.e).forEach(d=>{ if(inr(d)) holidays[d]=clean(v.sm); });
+    // ALL events (for per-day display): timed = start day only; all-day = each covered day
+    const title=v.sm.slice(0,60);
+    const days=v.timed?[iso(v.s)]:expand(v.s,v.e);
+    days.forEach(d=>{ if(inr(d)) addEvent(d,title); });
   });
-  return { first:first||win0, last:last||win1, holidays, minimumDays:[...minimum].sort() };
+  return { first:first||win0, last:last||win1, holidays, minimumDays:[...minimum].sort(), events };
 }
 function parseSchedule(text,fname){
   text=(text||'').trim();
@@ -156,7 +161,8 @@ function parseSchedule(text,fname){
   if((fname||'').toLowerCase().endsWith('.json') || text[0]==='{'){
     const o=JSON.parse(text);
     return { first:o.first||'', last:o.last||'', subtitle:o.subtitle||'',
-      holidays:o.holidays||{}, minimumDays:Array.isArray(o.minimumDays)?o.minimumDays:[] };
+      holidays:o.holidays||{}, minimumDays:Array.isArray(o.minimumDays)?o.minimumDays:[],
+      events:o.events||{} };
   }
   const out={first:'',last:'',holidays:{},minimumDays:[]};
   text.split(/\r?\n/).forEach((ln,i)=>{
@@ -188,8 +194,12 @@ function onSchedFile(ev){
 function saveSchedule(){
   if(!parsedSchedule){ return; }
   const m=document.getElementById('smsg'); m.className='msg'; m.textContent='Saving…';
-  dref('config/schedule').set(Object.assign({by:user.uid,ts:Date.now()},parsedSchedule))
-    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  the calendar will rebuild from this schedule.'; })
+  const events=parsedSchedule.events||{};
+  const sched={ first:parsedSchedule.first, last:parsedSchedule.last,
+    holidays:parsedSchedule.holidays||{}, minimumDays:parsedSchedule.minimumDays||[],
+    subtitle:parsedSchedule.subtitle||'', by:user.uid, ts:Date.now() };
+  Promise.all([ dref('config/schedule').set(sched), dref('config/events').set(events) ])
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  calendar rebuilt · '+Object.keys(events).length+' days with school events.'; })
     .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
 }
 function downloadTemplate(){

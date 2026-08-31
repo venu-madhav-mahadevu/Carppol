@@ -565,6 +565,18 @@
     background:rgba(255,255,255,.22);color:#fff;border-radius:9px;font-size:17px;line-height:1;cursor:pointer;}
   .bday-greeting .bg-close:hover{background:rgba(255,255,255,.35);}
   #confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:10055;}
+  /* School event indicator + day popup */
+  .cell .ev-dot{position:absolute;bottom:3px;right:4px;width:5px;height:5px;border-radius:50%;
+    background:#0EA5E9;box-shadow:0 0 0 1.5px rgba(255,255,255,.75);}
+  .cell.school .ev-dot{background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.15);}
+  .day-note{font-size:12.5px;margin:2px 0 12px;padding:8px 11px;border-radius:11px;
+    background:var(--paper);border:1px solid var(--line);color:var(--sub);line-height:1.45;}
+  .day-note b{color:var(--ink);}
+  .day-sec{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;}
+  .dayrow{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:11px;
+    background:var(--card);border:1px solid var(--line);margin-bottom:7px;}
+  .dayrow .de-ic{font-size:13px;flex:none;}
+  .dayrow .de-t{font-size:13px;color:var(--ink);line-height:1.35;}
 
   /* Falling flowers */
   .petals{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:9999;}
@@ -649,6 +661,10 @@
 
   <div class="overlay" id="logOverlay" role="dialog" aria-modal="true" aria-label="Carpool timings">
     <div class="modal" id="logModal"></div>
+  </div>
+
+  <div class="overlay" id="dayOverlay" role="dialog" aria-modal="true" aria-label="Day details">
+    <div class="modal" id="dayModal"></div>
   </div>
 
   <div class="alerts" id="alerts" aria-live="polite"></div>
@@ -1874,11 +1890,46 @@ function closeLog(){ cleanupRouteMap(); logOverlay.classList.remove('open'); }
 document.getElementById('logBtn').addEventListener('click',()=>openLog());
 logOverlay.addEventListener('click',e=>{if(e.target===logOverlay)closeLog();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLog();});
-// Tap any calendar date to see that day's track log
+// Tap any calendar date to see that day's details (school events + carpool)
 document.getElementById('cal').addEventListener('click',e=>{
   const c=e.target.closest('.cell[data-date]'); if(!c) return;
-  openLog(c.dataset.date);
+  openDay(c.dataset.date);
 });
+
+// ---- School events per day (from config/events) ----
+let SCHOOL_EVENTS={};
+function applyEventDots(){
+  document.querySelectorAll('.cell .ev-dot').forEach(d=>d.remove());
+  document.querySelectorAll('.cell[data-date]').forEach(c=>{
+    if(SCHOOL_EVENTS[c.dataset.date] && SCHOOL_EVENTS[c.dataset.date].length){
+      const dot=document.createElement('span'); dot.className='ev-dot'; c.appendChild(dot);
+    }
+  });
+}
+(function loadEventsConfig(){
+  if(!fbOK) return;
+  DB.on('config/events', ev=>{ SCHOOL_EVENTS=ev||{}; applyEventDots(); }, ()=>{});
+})();
+const dayOverlay=document.getElementById('dayOverlay');
+const dayModal=document.getElementById('dayModal');
+function openDay(date){
+  const events=SCHOOL_EVENTS[date]||[];
+  const driver=driverForDate(date);
+  const noSchool=NO_SCHOOL[date];
+  const early=EARLY.has(date);
+  let note='';
+  if(noSchool) note=`🏖️ <b>No school</b> — ${esc(noSchool)}`;
+  else if(driver) note=`🚗 <b>${esc(driver)}</b> drives${early?' · ⏰ minimum day, pickup 12:45 PM':' · pickup 2:00 PM'}`;
+  else note='Weekend / no carpool';
+  const evHtml = events.length
+    ? `<div class="day-sec">🏫 School events</div>`+events.map(e=>`<div class="dayrow"><span class="de-ic">📌</span><span class="de-t">${esc(e.t||e)}</span></div>`).join('')
+    : `<div class="day-sec">🏫 School events</div><div class="day-note">No school events on this day.</div>`;
+  const inner=`<div class="day-note">${note}</div>`+evHtml+
+    `<button class="mbtn maps" id="dayTimes">🕐 Carpool timings for this day</button>`;
+  UI.openModal('dayOverlay', inner, '📅 '+fmtDay(date));
+  const bt=dayModal.querySelector('#dayTimes');
+  if(bt) bt.addEventListener('click',()=>{ UI.closeModal('dayOverlay'); openLog(date); });
+}
 
 // ---- Swap Board ----
 const swapOverlay=document.getElementById('swapOverlay');
@@ -1987,6 +2038,7 @@ function rebuildCalendar(){
   if(typeof renderCountdown==='function') renderCountdown();
   if(typeof checkBirthdayToday==='function') checkBirthdayToday();
   if(typeof applyFilter==='function') applyFilter();
+  if(typeof applyEventDots==='function') applyEventDots();
 }
 
 // ---- Bell schedule from DB (admin upload) drives holidays / minimum days / year ----
