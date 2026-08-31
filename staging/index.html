@@ -538,6 +538,18 @@
     box-shadow:0 1px 2px rgba(16,24,40,.04);margin-top:10px;}
   .countchip b{color:var(--ink);font-weight:800;}
   .countchip .cc-em{font-size:14px;}
+  /* Birthday greeting */
+  .bday-greeting{position:relative;overflow:hidden;border-radius:18px;padding:16px 46px 16px 18px;
+    margin-bottom:16px;color:#fff;background:linear-gradient(120deg,#7C3AED,#DB2777 52%,#EA580C);
+    box-shadow:0 14px 34px -16px rgba(219,39,119,.6);animation:riseIn .6s cubic-bezier(.2,.7,.3,1) both;}
+  .bday-greeting .bg-title{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:600;line-height:1.15;}
+  .bday-greeting .bg-sub{font-size:13px;opacity:.96;margin-top:4px;}
+  .bday-greeting .bg-emoji{font-size:20px;animation:bwiggle 1.4s ease-in-out infinite;display:inline-block;}
+  @keyframes bwiggle{0%,100%{transform:rotate(-12deg) scale(1)}50%{transform:rotate(12deg) scale(1.15)}}
+  .bday-greeting .bg-close{position:absolute;top:12px;right:12px;width:27px;height:27px;border:none;
+    background:rgba(255,255,255,.22);color:#fff;border-radius:9px;font-size:17px;line-height:1;cursor:pointer;}
+  .bday-greeting .bg-close:hover{background:rgba(255,255,255,.35);}
+  #confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:10055;}
 
   /* Falling flowers */
   .petals{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:9999;}
@@ -925,6 +937,7 @@ document.getElementById('todayBtn').addEventListener('click',()=>{
 // ---- On load: show banner first, then slowly glide to today ----
 window.addEventListener('load',()=>{
   window.scrollTo(0,0); // start at the top so the banner is seen first
+  if(document.querySelector('.bday-greeting')) return; // birthday today — stay up to show the greeting 🎉
   const t=document.querySelector('.cell.today');
   if(!t) return;
   setTimeout(()=>slowScrollTo(t,2200),1300); // pause on banner, then drift down slowly
@@ -2108,7 +2121,54 @@ function updateKidBirthday(name,dob){
   BIRTHDAYS[name]={month:dob&&dob.month||0, day:dob&&dob.day||0, year:(dob&&dob.year)||null, photo:BIRTHDAYS[name].photo||''};
   renderKidBirthday(name); renderBdayBadges(); renderCountdown();
   if(typeof runAlerts==='function') runAlerts();
+  checkBirthdayToday();
 }
+
+// ---- Birthday greeting + confetti (shows on the actual birthday) ----
+function checkBirthdayToday(){
+  if(document.querySelector('.bday-greeting')) return;          // already showing
+  let seen=null; try{seen=localStorage.getItem('carpool-bday-seen');}catch(e){}
+  const [y,m,d]=TODAY.split('-').map(Number);
+  const who=[];
+  for(const nm in BIRTHDAYS){ const b=BIRTHDAYS[nm]; if(b&&b.month===m&&b.day===d) who.push({name:nm,age:b.year?(y-b.year):null}); }
+  if(!who.length || seen===TODAY) return;
+  celebrateBirthday(who);
+}
+function celebrateBirthday(who){
+  const names=who.map(w=>w.name);
+  const banner=document.createElement('div'); banner.className='bday-greeting';
+  const subs=who.map(w=>w.age?`${esc(w.name)} turns ${w.age} today 🎈`:`Wishing ${esc(w.name)} a wonderful day 🎈`).join(' · ');
+  banner.innerHTML=`<div class="bg-title"><span class="bg-emoji">🎉</span> Happy Birthday, ${names.map(esc).join(' & ')}! <span class="bg-emoji">🎂</span></div>`+
+    `<div class="bg-sub">${subs}</div>`+
+    `<button class="bg-close" aria-label="Close">×</button>`;
+  banner.querySelector('.bg-close').addEventListener('click',()=>{ banner.remove();
+    try{localStorage.setItem('carpool-bday-seen',TODAY);}catch(e){} });
+  const header=document.querySelector('header.top');
+  if(header&&header.parentNode) header.parentNode.insertBefore(banner,header.nextSibling);
+  else document.querySelector('.wrap').prepend(banner);
+  launchConfetti();
+}
+function launchConfetti(){
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  let cv=document.getElementById('confettiCanvas');
+  if(!cv){ cv=document.createElement('canvas'); cv.id='confettiCanvas'; document.body.appendChild(cv); }
+  const ctx=cv.getContext('2d'); const dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.width=innerWidth*dpr; cv.height=innerHeight*dpr; cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px';
+  const colors=['#7C3AED','#DB2777','#EA580C','#22C55E','#4F46E5','#FBBF24','#22D3EE'];
+  const parts=[];
+  for(let i=0;i<150;i++) parts.push({x:Math.random()*cv.width, y:-Math.random()*cv.height*0.4,
+    w:(6+Math.random()*6)*dpr, h:(9+Math.random()*9)*dpr, vy:(2+Math.random()*4)*dpr, vx:(-2+Math.random()*4)*dpr,
+    rot:Math.random()*6.28, vr:(-.25+Math.random()*.5), c:colors[Math.floor(Math.random()*colors.length)]});
+  const t0=performance.now(), dur=4000;
+  function frame(now){ const t=now-t0; ctx.clearRect(0,0,cv.width,cv.height);
+    parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.035*dpr; p.rot+=p.vr;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.globalAlpha=Math.max(0,1-t/dur);
+      ctx.fillStyle=p.c; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
+    if(t<dur) requestAnimationFrame(frame); else if(cv.parentNode) cv.remove();
+  }
+  requestAnimationFrame(frame);
+}
+checkBirthdayToday();
 
 // ---- Visitor counter (public /stats) ----
 (function visitorCounter(){
