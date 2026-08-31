@@ -566,9 +566,15 @@
   .bday-greeting .bg-close:hover{background:rgba(255,255,255,.35);}
   #confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:10055;}
   /* School event indicator + day popup */
-  .cell .ev-dot{position:absolute;bottom:3px;right:4px;width:5px;height:5px;border-radius:50%;
-    background:#0EA5E9;box-shadow:0 0 0 1.5px rgba(255,255,255,.75);}
-  .cell.school .ev-dot{background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.15);}
+  .cell .ev-mark{position:absolute;left:1px;right:1px;bottom:1px;font-size:6px;line-height:1.15;
+    font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
+    border-radius:3px;padding:1px 2px;letter-spacing:-.02em;
+    background:rgba(14,165,233,.18);color:#075985;}
+  .cell.school .ev-mark{background:rgba(255,255,255,.28);color:#fff;}
+  .cell.holiday .ev-mark{background:rgba(14,165,233,.14);color:#0369A1;}
+  .cell .who{margin-top:1px;}                       /* nudge driver name up to make room */
+  .cell.school .who,.cell.holiday .who{margin-bottom:8px;}
+  .cell.early .fri-flag{display:none;}
   .day-note{font-size:12.5px;margin:2px 0 12px;padding:8px 11px;border-radius:11px;
     background:var(--paper);border:1px solid var(--line);color:var(--sub);line-height:1.45;}
   .day-note b{color:var(--ink);}
@@ -1899,10 +1905,15 @@ document.getElementById('cal').addEventListener('click',e=>{
 // ---- School events per day (from config/events) ----
 let SCHOOL_EVENTS={};
 function applyEventDots(){
-  document.querySelectorAll('.cell .ev-dot').forEach(d=>d.remove());
+  document.querySelectorAll('.cell .ev-mark').forEach(d=>d.remove());
   document.querySelectorAll('.cell[data-date]').forEach(c=>{
-    if(SCHOOL_EVENTS[c.dataset.date] && SCHOOL_EVENTS[c.dataset.date].length){
-      const dot=document.createElement('span'); dot.className='ev-dot'; c.appendChild(dot);
+    const evs=SCHOOL_EVENTS[c.dataset.date];
+    if(evs && evs.length){
+      const first=String(evs[0].t||evs[0]||'').replace(/\s*@.*$/,'').replace(/\s*\(.*$/,'').trim();
+      const m=document.createElement('span'); m.className='ev-mark';
+      m.textContent = evs.length>1 ? (first+' +'+(evs.length-1)) : first;
+      m.title = evs.map(e=>e.t||e).join(' · ');
+      c.appendChild(m);
     }
   });
 }
