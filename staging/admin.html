@@ -97,10 +97,10 @@ function render(){
     '<button class="btn" id="saveHeader">Save school details</button>'+
     '<div class="msg" id="hmsg"></div></div>'+
     '<div class="card"><h2>📅 Bell schedule</h2>'+
-    '<div class="desc">Upload a CSV or JSON to set the school year, holidays and minimum days. The calendar rebuilds from it automatically.</div>'+
+    '<div class="desc">Upload the school calendar (<b>.ics</b> from Google/Outlook) or a CSV/JSON. Holidays &amp; minimum days are detected automatically and the calendar rebuilds from it.</div>'+
     '<button class="btn sec" id="dlTemplate">⬇️ Download CSV template</button>'+
-    '<label>Upload schedule file (.csv or .json)</label>'+
-    '<input id="schedFile" type="file" accept=".csv,.json">'+
+    '<label>Upload schedule file (.ics, .csv or .json)</label>'+
+    '<input id="schedFile" type="file" accept=".ics,.csv,.json,text/calendar">'+
     '<div id="schedPreview" class="desc" style="margin-top:10px"></div>'+
     '<button class="btn" id="saveSched" disabled>Save schedule</button>'+
     '<div class="msg" id="smsg"></div></div>'+
@@ -121,8 +121,38 @@ function render(){
 // ---- Bell schedule upload ----
 let parsedSchedule=null;
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+function parseICS(text){
+  text=text.replace(/\r?\n[ \t]/g,'');                 // unfold folded lines
+  const NO=/no school|holiday|recess|break|no student|non.?student|day off|closed|thanksgiv|winter|spring break|memorial|labor day|president|veteran|mlk|martin luther|new year|christmas|independence|indigenous|columbus|cesar chavez|lunar|staff development|pupil free/i;
+  const MIN=/minimum day|early dismissal|early release|shorten/i;
+  const FIRSTre=/first day of school/i, LASTre=/last day of school/i;
+  const iso=d=>d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);
+  const evs=[];
+  text.split('BEGIN:VEVENT').slice(1).forEach(bl=>{ const b=bl.split('END:VEVENT')[0];
+    const sm=(b.match(/^SUMMARY[^:]*:(.+)$/m)||[])[1]||'';
+    const ds=b.match(/DTSTART[^:]*:(\d{8})/), de=b.match(/DTEND[^:]*:(\d{8})/);
+    if(ds) evs.push({s:ds[1], e:de?de[1]:null, sm}); });
+  // find the school-year window from first/last day events (fallback: around now)
+  let first='', last='';
+  evs.forEach(v=>{ if(FIRSTre.test(v.sm)) first=first?first:iso(v.s); if(LASTre.test(v.sm)) last=iso(v.s); });
+  const now=new Date(); const win0=first||new Date(now.getFullYear(), now.getMonth()-1,1).toISOString().slice(0,10);
+  const win1=last||new Date(now.getFullYear()+1, now.getMonth(),1).toISOString().slice(0,10);
+  const inr=d=>d>=win0 && d<=win1;
+  function expand(s,e){ const sd=new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8));
+    const ed=e?new Date(+e.slice(0,4),+e.slice(4,6)-1,+e.slice(6,8)):new Date(sd.getTime()+864e5);
+    const out=[]; let cur=new Date(sd),g=0; while(cur<ed && g++<40){ out.push(cur.toISOString().slice(0,10)); cur=new Date(cur.getTime()+864e5);} return out; }
+  function clean(s){ s=s.replace(/\s*\(.*?\)/,'').trim().replace(/^No School\s*-\s*/i,'').replace(/^No School\s*$/i,'No school');
+    if(/Thanksgiving Break/i.test(s)) s='Thanksgiv.'; else if(/Winter Break|Spring Break/i.test(s)) s='Break'; return s.slice(0,12); }
+  const holidays={}, minimum=new Set();
+  evs.forEach(v=>{ if(!inr(iso(v.s))) return;
+    if(MIN.test(v.sm)) expand(v.s,v.e).forEach(d=>{ if(inr(d)) minimum.add(d); });
+    else if(NO.test(v.sm)) expand(v.s,v.e).forEach(d=>{ if(inr(d)) holidays[d]=clean(v.sm); });
+  });
+  return { first:first||win0, last:last||win1, holidays, minimumDays:[...minimum].sort() };
+}
 function parseSchedule(text,fname){
   text=(text||'').trim();
+  if((fname||'').toLowerCase().endsWith('.ics') || /BEGIN:VCALENDAR/i.test(text)) return parseICS(text);
   if((fname||'').toLowerCase().endsWith('.json') || text[0]==='{'){
     const o=JSON.parse(text);
     return { first:o.first||'', last:o.last||'', subtitle:o.subtitle||'',
