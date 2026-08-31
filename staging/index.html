@@ -749,13 +749,13 @@ const FRIDAY = {
   '2026-09-04':'Kumar','2026-10-02':'Kumar','2026-11-06':'Kumar','2026-12-18':'Kumar','2027-01-29':'Kumar','2027-03-05':'Kumar','2027-04-23':'Kumar','2027-05-21':'Kumar'
 };
 
-const FIRST='2026-08-11', LAST='2027-06-01';
+let FIRST='2026-08-11', LAST='2027-06-01';   // admin-configurable (bell schedule)
 // Use the real current date so "Today" reflects reality
 const _now=new Date();
 const TODAY=`${_now.getFullYear()}-${pad0(_now.getMonth()+1)}-${pad0(_now.getDate())}`;
 function pad0(n){return String(n).padStart(2,'0');}
 
-const NO_SCHOOL={
+let NO_SCHOOL={
   '2026-09-07':'Labor Day','2026-10-23':'Conf.','2026-11-11':'Veterans','2026-11-20':'Conf.',
   '2026-11-23':'Recess','2026-11-24':'Recess','2026-11-25':'Recess','2026-11-26':'Thanksgiv.','2026-11-27':'Recess',
   '2026-12-21':'Break','2026-12-22':'Break','2026-12-23':'Break','2026-12-24':'Break','2026-12-25':'Break',
@@ -764,16 +764,22 @@ const NO_SCHOOL={
   '2027-03-15':'Break','2027-03-16':'Break','2027-03-17':'Break','2027-03-18':'Break','2027-03-19':'Break',
   '2027-03-26':'Staff','2027-05-31':'Memorial'
 };
-const EARLY=new Set(['2026-08-11','2026-09-04','2026-10-21','2026-10-22','2026-11-19','2026-12-18','2027-01-15','2027-02-11','2027-03-11','2027-05-28','2027-06-01']);
+let EARLY=new Set(['2026-08-11','2026-09-04','2026-10-21','2026-10-22','2026-11-19','2026-12-18','2027-01-15','2027-02-11','2027-03-11','2027-05-28','2027-06-01']);
 
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW=['S','M','T','W','T','F','S'];
 const pad=n=>String(n).padStart(2,'0');
 const iso=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
 
+function monthSeq(){ // [year, monthIndex] from FIRST's month through LAST's month
+  const [fy,fm]=FIRST.split('-').map(Number), [ly,lm]=LAST.split('-').map(Number);
+  const seq=[]; let y=fy, m=fm-1; let guard=0;
+  while((y<ly || (y===ly && m<=lm-1)) && guard++<60){ seq.push([y,m]); m++; if(m>11){m=0;y++;} }
+  return seq;
+}
 function build(){
   const cal=document.getElementById('cal');
-  const seq=[[2026,7],[2026,8],[2026,9],[2026,10],[2026,11],[2027,0],[2027,1],[2027,2],[2027,3],[2027,4],[2027,5]];
+  const seq=monthSeq();
   seq.forEach(([y,m])=>{
     const month=document.createElement('div');month.className='month';
     month.innerHTML=`<div class="m-head"><span class="m-name">${MONTHS[m]}</span><span class="m-year">${y}</span></div>`+
@@ -1967,6 +1973,33 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
     if(cfg.subtitle!=null){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
     if(cfg.schoolUrl){ SCHOOL_URL=cfg.schoolUrl; }
     if(cfg.whatsapp!=null){ GROUP_WHATSAPP=cfg.whatsapp; }
+  }, ()=>{});
+})();
+
+// ---- Rebuild the whole calendar from data (used when the bell schedule changes) ----
+function rebuildCalendar(){
+  const cal=document.getElementById('cal'); if(cal) cal.innerHTML='';
+  build();
+  if(typeof renderBdayBadges==='function') renderBdayBadges();
+  document.querySelectorAll('.month').forEach((m,i)=>{ m.style.animationDelay=Math.min(i*0.06,0.6)+'s'; });
+  if(typeof buildBanner==='function') buildBanner();
+  if(typeof runAlerts==='function') runAlerts();
+  if(typeof renderCountdown==='function') renderCountdown();
+  if(typeof checkBirthdayToday==='function') checkBirthdayToday();
+  if(typeof applyFilter==='function') applyFilter();
+}
+
+// ---- Bell schedule from DB (admin upload) drives holidays / minimum days / year ----
+(function loadScheduleConfig(){
+  if(!fbOK) return;
+  DB.on('config/schedule', cfg=>{
+    if(!cfg) return; let changed=false;
+    if(cfg.first){ FIRST=cfg.first; changed=true; }
+    if(cfg.last){ LAST=cfg.last; changed=true; }
+    if(cfg.holidays && typeof cfg.holidays==='object'){ NO_SCHOOL=cfg.holidays; changed=true; }
+    if(Array.isArray(cfg.minimumDays)){ EARLY=new Set(cfg.minimumDays); changed=true; }
+    if(cfg.subtitle){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
+    if(changed) rebuildCalendar();
   }, ()=>{});
 })();
 

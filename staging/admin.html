@@ -96,16 +96,82 @@ function render(){
     '<label>WhatsApp group invite link</label><input id="fWa" type="url" placeholder="https://chat.whatsapp.com/…">'+
     '<button class="btn" id="saveHeader">Save school details</button>'+
     '<div class="msg" id="hmsg"></div></div>'+
+    '<div class="card"><h2>📅 Bell schedule</h2>'+
+    '<div class="desc">Upload a CSV or JSON to set the school year, holidays and minimum days. The calendar rebuilds from it automatically.</div>'+
+    '<button class="btn sec" id="dlTemplate">⬇️ Download CSV template</button>'+
+    '<label>Upload schedule file (.csv or .json)</label>'+
+    '<input id="schedFile" type="file" accept=".csv,.json">'+
+    '<div id="schedPreview" class="desc" style="margin-top:10px"></div>'+
+    '<button class="btn" id="saveSched" disabled>Save schedule</button>'+
+    '<div class="msg" id="smsg"></div></div>'+
     '<div class="card"><h2>More settings</h2>'+
-    '<div class="soon">Contacts, kids, drivers, rotation and holidays editors are coming next.</div></div>';
+    '<div class="soon">Contacts, kids, drivers and rotation editors are coming next.</div></div>';
   document.getElementById('outBtn').onclick=()=>auth.signOut();
   document.getElementById('saveHeader').onclick=saveHeader;
+  document.getElementById('dlTemplate').onclick=downloadTemplate;
+  document.getElementById('schedFile').onchange=onSchedFile;
+  document.getElementById('saveSched').onclick=saveSchedule;
   // prefill from current config
   dref('config/header').once('value').then(s=>{ const v=s.val()||{};
     if(document.getElementById('fOrg')){ document.getElementById('fOrg').value=v.org||'';
       document.getElementById('fTitle').value=v.title||''; document.getElementById('fSub').value=v.subtitle||'';
       document.getElementById('fUrl').value=v.schoolUrl||''; document.getElementById('fWa').value=v.whatsapp||''; }
   }).catch(()=>{});
+}
+// ---- Bell schedule upload ----
+let parsedSchedule=null;
+const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+function parseSchedule(text,fname){
+  text=(text||'').trim();
+  if((fname||'').toLowerCase().endsWith('.json') || text[0]==='{'){
+    const o=JSON.parse(text);
+    return { first:o.first||'', last:o.last||'', subtitle:o.subtitle||'',
+      holidays:o.holidays||{}, minimumDays:Array.isArray(o.minimumDays)?o.minimumDays:[] };
+  }
+  const out={first:'',last:'',holidays:{},minimumDays:[]};
+  text.split(/\r?\n/).forEach((ln,i)=>{
+    const p=ln.split(',').map(s=>s.trim()); if(!p[0]) return;
+    if(i===0 && /date/i.test(p[0])) return;                    // header row
+    const date=p[0], t=(p[1]||'').toLowerCase(), label=p[2]||'';
+    if(!DATE_RE.test(date)) return;
+    if(t==='holiday'||t==='no-school'||t==='noschool') out.holidays[date]=label||'No school';
+    else if(t==='minimum'||t==='min'||t==='early') out.minimumDays.push(date);
+    else if(t==='first'||t==='start') out.first=date;
+    else if(t==='last'||t==='end') out.last=date;
+  });
+  return out;
+}
+function onSchedFile(ev){
+  const f=ev.target.files&&ev.target.files[0]; const prev=document.getElementById('schedPreview');
+  const save=document.getElementById('saveSched'); const m=document.getElementById('smsg'); m.className='msg'; m.textContent='';
+  if(!f){ return; }
+  const rd=new FileReader();
+  rd.onload=()=>{ try{
+    parsedSchedule=parseSchedule(rd.result,f.name);
+    const hn=Object.keys(parsedSchedule.holidays||{}).length, mn=(parsedSchedule.minimumDays||[]).length;
+    prev.innerHTML='Parsed: <b>'+esc(parsedSchedule.first||'?')+'</b> → <b>'+esc(parsedSchedule.last||'?')+'</b><br>'+
+      hn+' no-school days · '+mn+' minimum days';
+    save.disabled=false;
+  }catch(e){ parsedSchedule=null; save.disabled=true; prev.textContent=''; m.className='msg err'; m.textContent='Could not parse file: '+(e.message||''); } };
+  rd.readAsText(f);
+}
+function saveSchedule(){
+  if(!parsedSchedule){ return; }
+  const m=document.getElementById('smsg'); m.className='msg'; m.textContent='Saving…';
+  dref('config/schedule').set(Object.assign({by:user.uid,ts:Date.now()},parsedSchedule))
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  the calendar will rebuild from this schedule.'; })
+    .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+}
+function downloadTemplate(){
+  const csv='date,type,label\n'+
+    '2026-08-11,first,First day of school\n'+
+    '2027-06-01,last,Last day of school\n'+
+    '2026-09-07,holiday,Labor Day\n'+
+    '2026-11-26,holiday,Thanksgiving\n'+
+    '2026-08-11,minimum,Minimum day\n';
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='bell-schedule-template.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
 function doLogin(){
   const email=document.getElementById('email').value.trim();
