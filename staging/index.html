@@ -153,7 +153,22 @@
   .visitcount.onlinenow{border-color:rgba(34,197,94,.45);}
 
   /* Toolbar */
-  .toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px;flex-wrap:wrap;}
+  /* Masthead (sticky top nav) */
+  .masthead{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px;
+    margin:-20px -14px 16px;padding:9px 14px;
+    background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+    border-bottom:1px solid var(--line);box-shadow:0 4px 16px -12px rgba(16,24,40,.3);}
+  .masthead .brand{flex:none;display:flex;align-items:center;gap:5px;text-decoration:none;
+    font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:16px;color:var(--ink);}
+  .masthead .brand span{background:linear-gradient(120deg,var(--venu),var(--kumar));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .toolbar{display:flex;gap:8px;align-items:center;flex:1;min-width:0;
+    overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:thin;
+    scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+  .toolbar::-webkit-scrollbar{height:5px;}
+  .toolbar::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+  .toolbar .btn,.toolbar .authbadge{flex:none;scroll-snap-align:start;}
+  @media print{ .masthead{display:none;} }
   .btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;
     color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:20px;
     padding:7px 14px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);
@@ -576,6 +591,27 @@
 </head>
 <body>
 <div class="wrap">
+  <div class="masthead">
+    <a class="brand" href="index.html">🚗 <span>Carpool</span></a>
+    <nav class="toolbar" aria-label="Actions">
+      <button class="authbadge" id="authBadge" type="button"><span class="ab-dot"></span><span id="abText">Log in</span></button>
+      <button class="btn" id="todayBtn" type="button">📍 Today</button>
+      <button class="btn" id="printBtn" type="button">🖨️ Print</button>
+      <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
+      <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
+      <button class="btn" id="contactBtn" type="button">📞 Contacts</button>
+      <button class="btn" id="whereBtn" type="button">🚗 Where?</button>
+      <button class="btn" id="liveBtn" type="button">📍 Live</button>
+      <button class="btn" id="logBtn" type="button">🕐 Times</button>
+      <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
+      <button class="btn" id="statsBtn" type="button">📊 Stats</button>
+      <button class="btn" id="chatBtn" type="button">💬 Chat</button>
+      <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
+      <a class="btn" id="adminBtn" href="admin.html">⚙️ Admin</a>
+      <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
+    </nav>
+  </div>
+
   <header class="top">
     <div class="eyebrow">Thornton Middle School · 2026–27</div>
     <h1>School Carpool</h1>
@@ -586,24 +622,6 @@
       <div class="visitcount onlinenow jsOnline"></div>
     </div>
   </header>
-
-  <div class="toolbar">
-    <button class="authbadge" id="authBadge" type="button"><span class="ab-dot"></span><span id="abText">Log in</span></button>
-    <button class="btn" id="todayBtn" type="button">📍 Today</button>
-    <button class="btn" id="printBtn" type="button">🖨️ Print</button>
-    <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
-    <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
-    <button class="btn" id="contactBtn" type="button">📞 Contacts</button>
-    <button class="btn" id="whereBtn" type="button">🚗 Where?</button>
-    <button class="btn" id="liveBtn" type="button">📍 Live</button>
-    <button class="btn" id="logBtn" type="button">🕐 Times</button>
-    <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
-    <button class="btn" id="statsBtn" type="button">📊 Stats</button>
-    <button class="btn" id="chatBtn" type="button">💬 Chat</button>
-    <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
-    <a class="btn" id="adminBtn" href="admin.html">⚙️ Admin</a>
-    <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
-  </div>
 
   <div class="overlay" id="contactOverlay" role="dialog" aria-modal="true" aria-label="Driver contacts">
     <div class="modal" id="contactModal"></div>
