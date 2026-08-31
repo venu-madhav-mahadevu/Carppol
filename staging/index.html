@@ -696,8 +696,8 @@ const CONTACTS = {
   'Kumar':  ''
 };
 // Paste your WhatsApp group invite link here (https://chat.whatsapp.com/....) or leave '' :
-const GROUP_WHATSAPP = '';
-const SCHOOL_URL = 'https://fremontunified.org/thornton/';
+let GROUP_WHATSAPP = '';                                    // admin-configurable
+let SCHOOL_URL = 'https://fremontunified.org/thornton/';    // admin-configurable
 
 /* ===== EDIT HERE: auto-record windows (24-hour HH:MM). On minimum days the
    afternoon automatically uses minDayAfternoon instead of afternoon. */
@@ -1963,8 +1963,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
   DB.on('config/header', cfg=>{
     if(!cfg) return;
     if(cfg.org!=null){ const e=document.querySelector('.eyebrow'); if(e) e.textContent=cfg.org; }
-    if(cfg.title!=null){ const h=document.querySelector('h1'); if(h) h.textContent=cfg.title; if(cfg.title) document.title=cfg.title+' Calendar'; }
+    if(cfg.title!=null){ const h=document.querySelector('h1'); if(h) h.textContent=cfg.title; if(cfg.title){ document.title=cfg.title+' Calendar'; const bs=document.querySelector('.masthead .brand span'); if(bs) bs.textContent=cfg.title; } }
     if(cfg.subtitle!=null){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
+    if(cfg.schoolUrl){ SCHOOL_URL=cfg.schoolUrl; }
+    if(cfg.whatsapp!=null){ GROUP_WHATSAPP=cfg.whatsapp; }
   }, ()=>{});
 })();
 

@@ -92,16 +92,19 @@ function render(){
     '<label>Eyebrow (school + year)</label><input id="fOrg" placeholder="Thornton Middle School · 2026–27">'+
     '<label>Title</label><input id="fTitle" placeholder="School Carpool">'+
     '<label>Subtitle</label><input id="fSub" placeholder="Leave home 7:30 AM · pickup 2:00 PM">'+
-    '<button class="btn" id="saveHeader">Save header</button>'+
+    '<label>School website URL</label><input id="fUrl" type="url" placeholder="https://school.example.org/">'+
+    '<label>WhatsApp group invite link</label><input id="fWa" type="url" placeholder="https://chat.whatsapp.com/…">'+
+    '<button class="btn" id="saveHeader">Save school details</button>'+
     '<div class="msg" id="hmsg"></div></div>'+
     '<div class="card"><h2>More settings</h2>'+
-    '<div class="soon">Drivers, contacts, rotation, holidays and kids editors are coming next — tell the developer which to add.</div></div>';
+    '<div class="soon">Contacts, kids, drivers, rotation and holidays editors are coming next.</div></div>';
   document.getElementById('outBtn').onclick=()=>auth.signOut();
   document.getElementById('saveHeader').onclick=saveHeader;
   // prefill from current config
   dref('config/header').once('value').then(s=>{ const v=s.val()||{};
     if(document.getElementById('fOrg')){ document.getElementById('fOrg').value=v.org||'';
-      document.getElementById('fTitle').value=v.title||''; document.getElementById('fSub').value=v.subtitle||''; }
+      document.getElementById('fTitle').value=v.title||''; document.getElementById('fSub').value=v.subtitle||'';
+      document.getElementById('fUrl').value=v.schoolUrl||''; document.getElementById('fWa').value=v.whatsapp||''; }
   }).catch(()=>{});
 }
 function doLogin(){
@@ -115,8 +118,10 @@ function saveHeader(){
   const org=document.getElementById('fOrg').value.trim();
   const title=document.getElementById('fTitle').value.trim();
   const subtitle=document.getElementById('fSub').value.trim();
+  const schoolUrl=document.getElementById('fUrl').value.trim();
+  const whatsapp=document.getElementById('fWa').value.trim();
   const m=document.getElementById('hmsg'); m.className='msg'; m.textContent='Saving…';
-  dref('config/header').set({org,title,subtitle,by:user.uid,ts:Date.now()})
+  dref('config/header').set({org,title,subtitle,schoolUrl,whatsapp,by:user.uid,ts:Date.now()})
     .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  (open the calendar to see it)'; })
     .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
 }
