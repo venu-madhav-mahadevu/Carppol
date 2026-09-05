@@ -572,6 +572,16 @@
     background:rgba(14,165,233,.18);color:#075985;}
   .cell.school .ev-mark{background:rgba(255,255,255,.28);color:#fff;}
   .cell.holiday .ev-mark{background:rgba(14,165,233,.14);color:#0369A1;}
+  .swap-toast{position:fixed;top:64px;right:14px;z-index:10001;max-width:290px;line-height:1.35;
+    background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+    border:1px solid var(--glass-brd);border-radius:14px;padding:11px 14px;font-size:12.5px;cursor:pointer;
+    box-shadow:0 16px 40px -16px rgba(16,24,40,.5);display:flex;gap:10px;align-items:flex-start;
+    transform:translateX(120%);animation:swToastIn .4s cubic-bezier(.2,.9,.3,1) forwards;}
+  .swap-toast b{color:var(--ink);}
+  .swap-toast.out{animation:swToastOut .35s ease forwards;}
+  @keyframes swToastIn{to{transform:translateX(0);}}
+  @keyframes swToastOut{to{transform:translateX(120%);opacity:0;}}
+  @media (max-width:520px){.swap-toast{left:12px;right:12px;max-width:none;}}
   .cell .swap-ind{position:absolute;top:2px;left:3px;font-size:9px;font-weight:800;color:#fff;
     background:rgba(0,0,0,.28);border-radius:5px;padding:0 3px;line-height:1.35;}
   .cell.swapped{box-shadow:inset 0 0 0 2px rgba(255,255,255,.6);}
@@ -1988,6 +1998,7 @@ function openSwaps(){
     `<div id="swList"><div class="where-empty">Loading…</div></div>`);
   swapModal.querySelector('#swPost').addEventListener('click',postSwap);
   listenSwaps();
+  markSwapsSeen();
 }
 function postSwap(){
   const date=swapModal.querySelector('#swDate').value;
@@ -2096,6 +2107,39 @@ function rebuildCalendar(){
   }, ()=>{});
 })();
 
+// ---- Swap request notifications (badge on 🔁 Swaps + toast) ----
+let swapSeen=new Set(); try{swapSeen=new Set(JSON.parse(localStorage.getItem('carpool-swap-seen')||'[]'));}catch(e){}
+let swapKnownIds=null;   // null until first snapshot (so we don't toast the backlog)
+function setSwapBadge(n){
+  const b=document.getElementById('swapBtn'); if(!b) return;
+  let dot=b.querySelector('.btn-badge');
+  if(n>0){ if(!dot){dot=document.createElement('span');dot.className='btn-badge';b.appendChild(dot);} dot.textContent=n>9?'9+':String(n); }
+  else if(dot){ dot.remove(); }
+}
+function showSwapToast(s){
+  const t=document.createElement('div'); t.className='swap-toast';
+  t.innerHTML=`<span style="font-size:18px">🔁</span><div><b>${esc(s.byName)}</b> needs a swap<br><span style="color:var(--sub)">${fmtDay(s.date)}${s.note?' · '+esc(s.note):''} — tap to swap a date</span></div>`;
+  t.addEventListener('click',()=>{ t.remove(); openSwaps(); });
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),400); }, 9000);
+}
+function handleSwapNotifs(openOthers){
+  const ids=openOthers.map(s=>s.id);
+  // toast only newly-arrived requests (after the first snapshot)
+  if(swapKnownIds!==null && !swapOverlay.classList.contains('open')){
+    openOthers.forEach(s=>{ if(!swapKnownIds.has(s.id) && !swapSeen.has(s.id)) showSwapToast(s); });
+  }
+  swapKnownIds=new Set(ids);
+  // badge = unseen open requests from others
+  const unseen=openOthers.filter(s=>!swapSeen.has(s.id)).length;
+  setSwapBadge(swapOverlay.classList.contains('open')?0:unseen);
+}
+function markSwapsSeen(){
+  if(swapKnownIds){ swapKnownIds.forEach(id=>swapSeen.add(id)); }
+  try{localStorage.setItem('carpool-swap-seen',JSON.stringify([...swapSeen].slice(-200)));}catch(e){}
+  setSwapBadge(0);
+}
+
 // ---- Covered swaps repaint the calendar (signed-in family only) ----
 (function loadSwapOverrides(){
   if(!fbOK) return; let swapOverrideRef=null;
@@ -2104,14 +2148,18 @@ function rebuildCalendar(){
       if(!swapOverrideRef){
         swapOverrideRef=dref('swaps');
         swapOverrideRef.on('value',snap=>{
-          const data=snap.val()||{}, next={};
-          Object.values(data).forEach(v=>{
+          const data=snap.val()||{}, next={}, today=localDateStr(Date.now()), openOthers=[];
+          Object.entries(data).forEach(([id,v])=>{
             if(v && v.status==='covered' && v.date && v.coverName){
               next[v.date]={name:v.coverName, from:v.byName||'', slot:v.slot||'Both'};
               if(v.coverDate && v.byName) next[v.coverDate]={name:v.byName, from:v.coverName, slot:'Both'};
             }
+            if(v && v.status!=='covered' && v.date>=today && v.by!==(currentUser&&currentUser.uid)){
+              openOthers.push({id, byName:v.byName||'A driver', date:v.date, note:v.note||''});
+            }
           });
           if(JSON.stringify(next)!==JSON.stringify(SWAP_OVERRIDES)){ SWAP_OVERRIDES=next; rebuildCalendar(); }
+          handleSwapNotifs(openOthers);
         },()=>{});
       }
     }else{
