@@ -1976,8 +1976,9 @@ function openSwaps(){
   }
   const today=localDateStr(Date.now());
   swapShell(
-    `<div class="msub">Can’t drive your day? Post it — another family can cover.</div>`+
+    `<div class="msub">Can’t drive a day? Post the date + a note. Another driver picks one of <b>their</b> days to swap with you.</div>`+
     `<div class="swap-form">`+
+      `<label style="font-size:11px;font-weight:700;color:var(--sub)">Date you can’t drive</label>`+
       `<input class="finput" type="date" id="swDate" value="${today}" min="${today}">`+
       `<div class="row"><select class="fselect" id="swSlot">`+
         `<option value="Both">Both ways</option><option value="Morning">Morning only</option><option value="Afternoon">Afternoon only</option></select></div>`+
@@ -1998,10 +1999,10 @@ function postSwap(){
     .then(()=>{swapModal.querySelector('#swNote').value='';})
     .catch(err=>alert('Could not post: '+(err.message||'')));
 }
-function claimSwap(id,s){
+function claimSwap(id,coverDate){
   const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
-  dref('swaps/'+id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverTs:Date.now()})
-    .catch(err=>alert('Could not cover: '+(err.message||'')));
+  dref('swaps/'+id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverDate:coverDate||null,coverTs:Date.now()})
+    .catch(err=>alert('Could not swap: '+(err.message||'')));
 }
 function cancelSwap(id){ dref('swaps/'+id).remove().catch(()=>{}); }
 function listenSwaps(){
@@ -2013,23 +2014,39 @@ function listenSwaps(){
     const covered=rows.filter(r=>r.status==='covered'&&r.date>=today);
     const past=rows.filter(r=>r.date<today).slice(-5);
     const list=swapModal.querySelector('#swList'); if(!list) return;
+    const shortD=d=>{const dt=new Date(...String(d).split('-').map((v,i)=>i===1?v-1:+v));return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
     const card=r=>{
       const g=SGRAD[PCLASS[r.byName]]||'#94A3B8';
       const cls=r.status==='covered'?'covered':(r.date<today?'past':'open');
       const mine=r.by===currentUser.uid;
       let action='';
-      if(cls==='open'&&!mine) action=`<button class="sc-act" data-claim="${r.id}">I’ll cover</button>`;
+      if(cls==='open'&&!mine) action=`<button class="sc-act" data-swap="${r.id}">🔁 Swap a date</button>`;
       else if(cls==='open'&&mine) action=`<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`;
       else if(cls==='covered') action=`<span class="sc-tag">✅ ${esc(r.coverName||'covered')}</span>`;
+      const sub = cls==='covered'
+        ? `${esc(r.coverName||'')} takes ${shortD(r.date)}${r.coverDate?` · ${esc(r.byName||'')} takes ${shortD(r.coverDate)}`:''}`
+        : `${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}`;
       return `<div class="swapcard ${cls}" style="--scg:${g}"><div class="sc-av">${esc((r.byName||'?')[0])}</div>`+
         `<div class="sc-info"><div class="sc-when">${esc(r.byName||'Driver')} · ${fmtDay(r.date)}</div>`+
-        `<div class="sc-sub">${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}</div></div>${action}</div>`;
+        `<div class="sc-sub">${sub}</div></div>${action}</div>`;
     };
     list.innerHTML=
       `<div class="swap-sec">🔴 Open requests</div>`+(open.length?open.map(card).join(''):`<div class="where-empty" style="padding:12px">No open requests 🎉</div>`)+
-      (covered.length?`<div class="swap-sec">✅ Covered</div>`+covered.map(card).join(''):'')+
+      (covered.length?`<div class="swap-sec">✅ Swapped</div>`+covered.map(card).join(''):'')+
       (past.length?`<div class="swap-sec">🕓 Recent</div>`+past.map(card).join(''):'');
-    list.querySelectorAll('[data-claim]').forEach(b=>b.addEventListener('click',()=>claimSwap(b.dataset.claim)));
+    list.querySelectorAll('[data-swap]').forEach(b=>b.addEventListener('click',()=>{
+      const id=b.dataset.swap;
+      const box=document.createElement('div'); box.style.cssText='flex:none;display:flex;gap:5px;align-items:center';
+      box.innerHTML=`<input type="date" class="finput sc-date" min="${today}" style="width:auto;padding:6px 8px;font-size:12px">`+
+        `<button class="sc-act" type="button">Confirm</button>`;
+      b.replaceWith(box);
+      const inp=box.querySelector('.sc-date');
+      box.querySelector('.sc-act').addEventListener('click',()=>{
+        if(!inp.value){ inp.focus(); return; }
+        claimSwap(id, inp.value);
+      });
+      inp.focus();
+    }));
     list.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelSwap(b.dataset.cancel)));
   },err=>{const l=swapModal.querySelector('#swList');if(l)l.innerHTML=`<div class="where-empty">Couldn’t load swaps.<br>${esc(err.message||'')}</div>`;});
 }
@@ -2091,6 +2108,7 @@ function rebuildCalendar(){
           Object.values(data).forEach(v=>{
             if(v && v.status==='covered' && v.date && v.coverName){
               next[v.date]={name:v.coverName, from:v.byName||'', slot:v.slot||'Both'};
+              if(v.coverDate && v.byName) next[v.coverDate]={name:v.byName, from:v.coverName, slot:'Both'};
             }
           });
           if(JSON.stringify(next)!==JSON.stringify(SWAP_OVERRIDES)){ SWAP_OVERRIDES=next; rebuildCalendar(); }
