@@ -1,0 +1,16 @@
+{
+  "name": "School Carpool Calendar",
+  "short_name": "Carpool",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1319",
+  "theme_color": "#4F46E5",
+  "description": "Thornton Middle School carpool rotation, live tracking, swaps and chat.",
+  "icons": [
+    {"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
