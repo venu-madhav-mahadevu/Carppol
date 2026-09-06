@@ -670,6 +670,10 @@
     <div class="modal" id="swapModal"></div>
   </div>
 
+  <div class="overlay" id="swapReqOverlay" role="dialog" aria-modal="true" aria-label="Swap request">
+    <div class="modal" id="swapReqModal"></div>
+  </div>
+
   <div class="overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-label="Driving stats">
     <div class="modal" id="statsModal"></div>
   </div>
@@ -2123,11 +2127,39 @@ function showSwapToast(s){
   document.body.appendChild(t);
   setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),400); }, 9000);
 }
+const swapReqOverlay=document.getElementById('swapReqOverlay');
+const swapReqModal=document.getElementById('swapReqModal');
+function closeSwapReq(){ swapReqOverlay.classList.remove('open'); }
+function showSwapRequestPopup(s){
+  if(swapReqOverlay.classList.contains('open') || swapOverlay.classList.contains('open')) return; // don't stack
+  const today=localDateStr(Date.now());
+  swapReqModal.innerHTML=
+    `<button class="mclose" id="srClose" aria-label="Close">×</button>`+
+    `<h2>🔁 Swap request</h2>`+
+    `<div class="msub"><b>${esc(s.byName)}</b> can’t drive <b>${fmtDay(s.date)}</b>${s.note?` — “${esc(s.note)}”`:''}. Pick one of your days to swap.</div>`+
+    `<div class="swap-form">`+
+      `<label style="font-size:11px;font-weight:700;color:var(--sub)">Your date to give in return</label>`+
+      `<input type="date" class="finput" id="srDate" min="${today}">`+
+      `<button class="mbtn live" id="srSwap">🔁 Swap this date</button>`+
+      `<button class="mbtn" id="srLater">Later</button>`+
+      `<div class="msg" id="srMsg"></div>`+
+    `</div>`;
+  swapReqOverlay.classList.add('open');
+  swapReqModal.querySelector('#srClose').addEventListener('click',closeSwapReq);
+  swapReqModal.querySelector('#srLater').addEventListener('click',closeSwapReq);
+  swapReqModal.querySelector('#srSwap').addEventListener('click',()=>{
+    const dv=swapReqModal.querySelector('#srDate').value;
+    if(!dv){ swapReqModal.querySelector('#srMsg').textContent='Pick your date first.'; swapReqModal.querySelector('#srDate').focus(); return; }
+    claimSwap(s.id, dv); swapSeen.add(s.id); markSwapsSeen(); closeSwapReq();
+  });
+}
+swapReqOverlay.addEventListener('click',e=>{ if(e.target===swapReqOverlay) closeSwapReq(); });
 function handleSwapNotifs(openOthers){
   const ids=openOthers.map(s=>s.id);
-  // toast only newly-arrived requests (after the first snapshot)
+  // popup for newly-arrived requests (after the first snapshot); extra ones as toasts
   if(swapKnownIds!==null && !swapOverlay.classList.contains('open')){
-    openOthers.forEach(s=>{ if(!swapKnownIds.has(s.id) && !swapSeen.has(s.id)) showSwapToast(s); });
+    const fresh=openOthers.filter(s=>!swapKnownIds.has(s.id) && !swapSeen.has(s.id));
+    if(fresh.length){ showSwapRequestPopup(fresh[0]); fresh.slice(1).forEach(showSwapToast); }
   }
   swapKnownIds=new Set(ids);
   // badge = unseen open requests from others
