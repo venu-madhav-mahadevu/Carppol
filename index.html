@@ -572,6 +572,14 @@
     background:rgba(14,165,233,.18);color:#075985;}
   .cell.school .ev-mark{background:rgba(255,255,255,.28);color:#fff;}
   .cell.holiday .ev-mark{background:rgba(14,165,233,.14);color:#0369A1;}
+  .swap-banner{display:flex;align-items:center;gap:11px;margin-bottom:16px;padding:12px 15px;border-radius:14px;
+    color:#fff;background:linear-gradient(120deg,#F59E0B,#C2620A);box-shadow:0 12px 30px -14px rgba(194,98,10,.6);
+    animation:riseIn .5s cubic-bezier(.2,.7,.3,1) both;}
+  .swap-banner .sb-ic{font-size:20px;flex:none;animation:bwiggle 1.6s ease-in-out infinite;}
+  .swap-banner .sb-txt{flex:1;font-size:13.5px;line-height:1.3;}
+  .swap-banner .sb-txt b{font-weight:800;}
+  .swap-banner .sb-view{font:inherit;font-weight:800;font-size:12.5px;color:#C2620A;background:#fff;border:none;
+    border-radius:20px;padding:7px 15px;cursor:pointer;flex:none;}
   .swap-toast{position:fixed;top:64px;right:14px;z-index:10001;max-width:290px;line-height:1.35;
     background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
     border:1px solid var(--glass-brd);border-radius:14px;padding:11px 14px;font-size:12.5px;cursor:pointer;
@@ -2166,7 +2174,8 @@ function rebuildCalendar(){
 
 // ---- Swap request notifications (badge on 🔁 Swaps + toast) ----
 let swapSeen=new Set(); try{swapSeen=new Set(JSON.parse(localStorage.getItem('carpool-swap-seen')||'[]'));}catch(e){}
-let swapKnownIds=null;   // null until first snapshot (so we don't toast the backlog)
+let swapKnownIds=null;   // null until first snapshot
+let swapFirstLoad=true;  // show a popup on page load if anything is pending
 function setSwapBadge(n){
   const b=document.getElementById('swapBtn'); if(!b) return;
   let dot=b.querySelector('.btn-badge');
@@ -2227,15 +2236,41 @@ function saveSwapSeen(){ try{localStorage.setItem('carpool-swap-seen',JSON.strin
 function handleSwapNotifs(openOthers, proposalsForMe){
   proposalsForMe=proposalsForMe||[];
   const boardOpen=swapOverlay.classList.contains('open'), popupOpen=swapReqOverlay.classList.contains('open');
-  if(swapKnownIds!==null && !boardOpen && !popupOpen){
-    const freshProp=proposalsForMe.filter(s=>!swapSeen.has('P'+s.id));
-    const freshOpen=openOthers.filter(s=>!swapKnownIds.has(s.id) && !swapSeen.has(s.id));
-    if(freshProp.length){ showSwapApprovePopup(freshProp[0]); swapSeen.add('P'+freshProp[0].id); saveSwapSeen(); }
-    else if(freshOpen.length){ showSwapRequestPopup(freshOpen[0]); freshOpen.slice(1).forEach(showSwapToast); }
+  if(!boardOpen && !popupOpen){
+    if(swapFirstLoad){
+      // page load / refresh: pop up any pending request (proposals for me first, then open requests)
+      if(proposalsForMe.length){ showSwapApprovePopup(proposalsForMe[0]); }
+      else if(openOthers.length){ showSwapRequestPopup(openOthers[0]); openOthers.slice(1).forEach(showSwapToast); }
+    } else {
+      const freshProp=proposalsForMe.filter(s=>!swapSeen.has('P'+s.id));
+      const freshOpen=openOthers.filter(s=>!swapKnownIds.has(s.id) && !swapSeen.has(s.id));
+      if(freshProp.length){ showSwapApprovePopup(freshProp[0]); swapSeen.add('P'+freshProp[0].id); saveSwapSeen(); }
+      else if(freshOpen.length){ showSwapRequestPopup(freshOpen[0]); freshOpen.slice(1).forEach(showSwapToast); }
+    }
   }
+  swapFirstLoad=false;
   swapKnownIds=new Set(openOthers.map(s=>s.id));
   const unseen=openOthers.filter(s=>!swapSeen.has(s.id)).length + proposalsForMe.length;
   setSwapBadge(boardOpen?0:unseen);
+  updateSwapBanner(openOthers, proposalsForMe);
+}
+// persistent on-page alert banner while swap requests are pending
+function updateSwapBanner(openOthers, proposalsForMe){
+  const total=(openOthers?openOthers.length:0)+(proposalsForMe?proposalsForMe.length:0);
+  let b=document.getElementById('swapBanner');
+  if(total>0){
+    if(!b){ b=document.createElement('div'); b.id='swapBanner'; b.className='swap-banner';
+      const mast=document.querySelector('.masthead');
+      if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
+      else document.querySelector('.wrap').prepend(b); }
+    const np=proposalsForMe?proposalsForMe.length:0;
+    const msg = np
+      ? `<b>${np}</b> swap ${np>1?'offers':'offer'} ${np>1?'need':'needs'} your approval`
+      : `<b>${total}</b> swap ${total>1?'requests':'request'} — someone needs a cover`;
+    b.innerHTML=`<span class="sb-ic">🔁</span><div class="sb-txt">${msg}</div><button class="sb-view" type="button">View</button>`;
+    b.querySelector('.sb-view').addEventListener('click',()=>openSwaps());
+    b.hidden=false;
+  } else if(b){ b.hidden=true; }
 }
 function markSwapsSeen(){
   if(swapKnownIds){ swapKnownIds.forEach(id=>swapSeen.add(id)); }
