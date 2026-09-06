@@ -1963,10 +1963,13 @@ function openDay(date){
     ? `<div class="day-sec">🏫 School events</div>`+events.map(e=>`<div class="dayrow"><span class="de-ic">📌</span><span class="de-t">${esc(e.t||e)}</span></div>`).join('')
     : `<div class="day-sec">🏫 School events</div><div class="day-note">No school events on this day.</div>`;
   const inner=`<div class="day-note">${note}</div>`+evHtml+
+    (driver&&fbOK?`<button class="mbtn live" id="daySwap">🔁 Request a swap for this day</button>`:'')+
     `<button class="mbtn maps" id="dayTimes">🕐 Carpool timings for this day</button>`;
   UI.openModal('dayOverlay', inner, '📅 '+fmtDay(date));
   const bt=dayModal.querySelector('#dayTimes');
   if(bt) bt.addEventListener('click',()=>{ UI.closeModal('dayOverlay'); openLog(date); });
+  const sw=dayModal.querySelector('#daySwap');
+  if(sw) sw.addEventListener('click',()=>{ UI.closeModal('dayOverlay'); openSwaps(date); });
 }
 
 // ---- Swap Board ----
@@ -1979,7 +1982,7 @@ function swapShell(inner){
     `<h2>🔁 Swap Board</h2>`+inner;
   swapModal.querySelector('#swcloseBtn').addEventListener('click',closeSwaps);
 }
-function openSwaps(){
+function openSwaps(preDate){
   swapOverlay.classList.add('open');
   if(!fbOK){ swapShell(`<div class="where-empty">Set up Firebase to use the swap board.</div>`); return; }
   if(!currentUser){
@@ -1989,11 +1992,12 @@ function openSwaps(){
     return;
   }
   const today=localDateStr(Date.now());
+  const sel=(typeof preDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(preDate)&&preDate>=today)?preDate:today;
   swapShell(
     `<div class="msub">Can’t drive a day? Post the date + a note. Another driver picks one of <b>their</b> days to swap with you.</div>`+
     `<div class="swap-form">`+
       `<label style="font-size:11px;font-weight:700;color:var(--sub)">Date you can’t drive</label>`+
-      `<input class="finput" type="date" id="swDate" value="${today}" min="${today}">`+
+      `<input class="finput" type="date" id="swDate" value="${sel}" min="${today}">`+
       `<div class="row"><select class="fselect" id="swSlot">`+
         `<option value="Both">Both ways</option><option value="Morning">Morning only</option><option value="Afternoon">Afternoon only</option></select>`+
         `<select class="fselect" id="swReq"><option value="">Ask anyone</option>`+NAMES.map(n=>`<option value="${n}">Ask ${n}</option>`).join('')+`</select></div>`+
