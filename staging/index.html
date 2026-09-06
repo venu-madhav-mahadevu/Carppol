@@ -585,6 +585,17 @@
   .cell .swap-ind{position:absolute;top:2px;left:3px;font-size:9px;font-weight:800;color:#fff;
     background:rgba(0,0,0,.28);border-radius:5px;padding:0 3px;line-height:1.35;}
   .cell.swapped{box-shadow:inset 0 0 0 2px rgba(255,255,255,.6);}
+  .cell.selected{outline:3px solid var(--venu);outline-offset:2px;z-index:7;}
+  .cell-swap{position:fixed;z-index:9998;display:flex;gap:6px;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:6px;
+    box-shadow:0 14px 34px -12px rgba(16,24,40,.45);animation:acFade .16s ease;}
+  .cell-swap::before{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%) rotate(45deg);
+    width:11px;height:11px;background:var(--card);border-left:1px solid var(--line);border-top:1px solid var(--line);}
+  .cell-swap.above::before{top:auto;bottom:-6px;transform:translateX(-50%) rotate(225deg);}
+  .cell-swap button{font:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:9px;
+    padding:8px 12px;cursor:pointer;white-space:nowrap;}
+  .cell-swap .cs-swap{background:#22C55E;color:#fff;}
+  .cell-swap .cs-info{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
   .cell .who{margin-top:1px;}                       /* nudge driver name up to make room */
   .cell.school .who,.cell.holiday .who{margin-bottom:8px;}
   .cell.early .fri-flag{display:none;}
@@ -1923,11 +1934,33 @@ function closeLog(){ cleanupRouteMap(); logOverlay.classList.remove('open'); }
 document.getElementById('logBtn').addEventListener('click',()=>openLog());
 logOverlay.addEventListener('click',e=>{if(e.target===logOverlay)closeLog();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLog();});
-// Tap any calendar date to see that day's details (school events + carpool)
+// Tap a date -> select it inline and show a small Swap / Details popover on the calendar
+let selectedCell=null, cellSwapEl=null;
+function clearCellSwap(){ if(cellSwapEl){cellSwapEl.remove();cellSwapEl=null;} if(selectedCell){selectedCell.classList.remove('selected');selectedCell=null;} }
+function selectCell(c){
+  const date=c.dataset.date; if(!date) return;
+  if(selectedCell===c){ clearCellSwap(); return; }        // tap again to deselect
+  clearCellSwap();
+  selectedCell=c; c.classList.add('selected');
+  const isSchool=c.classList.contains('school');
+  const el=document.createElement('div'); el.className='cell-swap';
+  el.innerHTML=(isSchool&&fbOK?`<button class="cs-swap" type="button">🔁 Swap</button>`:'')+
+    `<button class="cs-info" type="button">📅 Details</button>`;
+  document.body.appendChild(el); cellSwapEl=el;
+  const rect=c.getBoundingClientRect(), ew=el.offsetWidth, eh=el.offsetHeight;
+  let left=Math.max(8,Math.min(rect.left+rect.width/2-ew/2, innerWidth-ew-8));
+  let top=rect.bottom+9; if(top+eh>innerHeight-8){ top=rect.top-eh-9; el.classList.add('above'); }
+  el.style.left=left+'px'; el.style.top=top+'px';
+  const sw=el.querySelector('.cs-swap');
+  if(sw) sw.addEventListener('click',ev=>{ ev.stopPropagation(); clearCellSwap(); openSwaps(date); });
+  el.querySelector('.cs-info').addEventListener('click',ev=>{ ev.stopPropagation(); clearCellSwap(); openDay(date); });
+}
 document.getElementById('cal').addEventListener('click',e=>{
   const c=e.target.closest('.cell[data-date]'); if(!c) return;
-  openDay(c.dataset.date);
+  e.stopPropagation(); selectCell(c);
 });
+document.addEventListener('click',e=>{ if(!e.target.closest('.cell-swap')&&!e.target.closest('.cell[data-date]')) clearCellSwap(); });
+window.addEventListener('scroll',clearCellSwap,{passive:true});
 
 // ---- School events per day (from config/events) ----
 let SCHOOL_EVENTS={};
