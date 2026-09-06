@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carpool Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+  :root{ --ink:#1E293B; --muted:#94A3B8; --line:#E7E9EF; --paper:#F6F7FB; --card:#fff; --sub:#64748B; --brand:#4F46E5; }
+  @media (prefers-color-scheme:dark){ :root{ --ink:#E8ECF3; --muted:#7B8798; --line:#2A2F3A; --paper:#0F1319; --card:#171C24; --sub:#9AA6B6; } }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--paper);color:var(--ink);
+    line-height:1.45;padding:24px 16px 60px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:520px;margin:0 auto;}
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);font-weight:700;}
+  h1{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:28px;margin:4px 0 3px;}
+  .back{font-size:13px;color:var(--sub);text-decoration:none;}
+  .back:hover{color:var(--ink);}
+  .env{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;margin-left:8px;
+    background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:18px;
+    box-shadow:0 8px 24px -16px rgba(16,24,40,.25);}
+  .card h2{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;margin-bottom:4px;}
+  .card .desc{font-size:12.5px;color:var(--sub);margin-bottom:14px;}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:12px 0 5px;}
+  input{width:100%;font:inherit;font-size:14.5px;padding:11px 13px;border-radius:11px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);}
+  input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(79,70,229,.15);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;font:inherit;
+    font-size:14px;font-weight:700;padding:12px;border-radius:12px;border:none;cursor:pointer;
+    background:var(--brand);color:#fff;margin-top:16px;}
+  .btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line);}
+  .btn:active{transform:scale(.98);}
+  .msg{font-size:12.5px;margin-top:10px;min-height:16px;font-weight:600;}
+  .msg.ok{color:#16A34A;} .msg.err{color:#DB2777;}
+  .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sub);margin-top:8px;}
+  .who b{color:var(--ink);}
+  .who .out{margin-left:auto;font-size:12px;font-weight:700;color:#DB2777;background:none;border:none;cursor:pointer;}
+  .soon{font-size:12px;color:var(--muted);margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Carpool Admin<span class="env" id="envTag" style="display:none">STAGING</span></div>
+  <h1>⚙️ Configure</h1>
+  <a class="back" href="index.html">← Back to calendar</a>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDP7FpkwN9oWInx5RU2LrfD9uwnm28I4j4",
+  authDomain: "carpool-67212.firebaseapp.com",
+  databaseURL: "https://carpool-67212-default-rtdb.firebaseio.com",
+  projectId: "carpool-67212",
+  storageBucket: "carpool-67212.firebasestorage.app",
+  messagingSenderId: "1064173394713",
+  appId: "1:1064173394713:web:715389acb190e3ded54388"
+};
+const DB_PREFIX = (location.pathname.indexOf('/staging/')>=0) ? 'stg/' : '';
+if(DB_PREFIX){ const t=document.getElementById('envTag'); if(t) t.style.display=''; }
+let auth=null, db=null, user=null;
+try{ firebase.initializeApp(FIREBASE_CONFIG); auth=firebase.auth(); db=firebase.database();
+  auth.onAuthStateChanged(u=>{ user=u; render(); });
+}catch(e){ document.getElementById('content').innerHTML='<div class="card">Firebase not configured.</div>'; }
+function dref(p){ return db.ref(DB_PREFIX+p); }
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function render(){
+  const c=document.getElementById('content');
+  if(!user){
+    c.innerHTML=
+      '<div class="card"><h2>Admin sign in</h2>'+
+      '<div class="desc">Only carpool admins can change settings.</div>'+
+      '<label>Email</label><input id="email" type="email" autocomplete="username">'+
+      '<label>Password</label><input id="pass" type="password" autocomplete="current-password">'+
+      '<button class="btn" id="loginBtn">Log in</button>'+
+      '<div class="msg" id="loginMsg"></div></div>';
+    document.getElementById('loginBtn').onclick=doLogin;
+    document.getElementById('pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+    return;
+  }
+  const name=(user.displayName)||(user.email||'admin');
+  c.innerHTML=
+    '<div class="who">Signed in as <b>'+esc(name)+'</b><button class="out" id="outBtn">Sign out</button></div>'+
+    '<div class="card"><h2>School header</h2>'+
+    '<div class="desc">Shown at the top of the calendar. Changes apply live.</div>'+
+    '<label>Eyebrow (school + year)</label><input id="fOrg" placeholder="Thornton Middle School · 2026–27">'+
+    '<label>Title</label><input id="fTitle" placeholder="School Carpool">'+
+    '<label>Subtitle</label><input id="fSub" placeholder="Leave home 7:30 AM · pickup 2:00 PM">'+
+    '<label>School website URL</label><input id="fUrl" type="url" placeholder="https://school.example.org/">'+
+    '<label>WhatsApp group invite link</label><input id="fWa" type="url" placeholder="https://chat.whatsapp.com/…">'+
+    '<button class="btn" id="saveHeader">Save school details</button>'+
+    '<div class="msg" id="hmsg"></div></div>'+
+    '<div class="card"><h2>📅 Bell schedule</h2>'+
+    '<div class="desc">Upload the school calendar (<b>.ics</b> from Google/Outlook) or a CSV/JSON. Holidays &amp; minimum days are detected automatically and the calendar rebuilds from it.</div>'+
+    '<button class="btn sec" id="dlTemplate">⬇️ Download CSV template</button>'+
+    '<label>Upload schedule file (.ics, .csv or .json)</label>'+
+    '<input id="schedFile" type="file" accept=".ics,.csv,.json,text/calendar">'+
+    '<div id="schedPreview" class="desc" style="margin-top:10px"></div>'+
+    '<button class="btn" id="saveSched" disabled>Save schedule</button>'+
+    '<div class="msg" id="smsg"></div></div>'+
+    '<div class="card"><h2>More settings</h2>'+
+    '<div class="soon">Contacts, kids, drivers and rotation editors are coming next.</div></div>';
+  document.getElementById('outBtn').onclick=()=>auth.signOut();
+  document.getElementById('saveHeader').onclick=saveHeader;
+  document.getElementById('dlTemplate').onclick=downloadTemplate;
+  document.getElementById('schedFile').onchange=onSchedFile;
+  document.getElementById('saveSched').onclick=saveSchedule;
+  // prefill from current config
+  dref('config/header').once('value').then(s=>{ const v=s.val()||{};
+    if(document.getElementById('fOrg')){ document.getElementById('fOrg').value=v.org||'';
+      document.getElementById('fTitle').value=v.title||''; document.getElementById('fSub').value=v.subtitle||'';
+      document.getElementById('fUrl').value=v.schoolUrl||''; document.getElementById('fWa').value=v.whatsapp||''; }
+  }).catch(()=>{});
+}
+// ---- Bell schedule upload ----
+let parsedSchedule=null;
+const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+function parseICS(text){
+  text=text.replace(/\r?\n[ \t]/g,'');                 // unfold folded lines
+  const NO=/no school|holiday|recess|break|no student|non.?student|day off|closed|thanksgiv|winter|spring break|memorial|labor day|president|veteran|mlk|martin luther|new year|christmas|independence|indigenous|columbus|cesar chavez|lunar|staff development|pupil free/i;
+  const MIN=/minimum day|early dismissal|early release|shorten/i;
+  const FIRSTre=/first day of school/i, LASTre=/last day of school/i;
+  const iso=d=>d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);
+  const evs=[];
+  text.split('BEGIN:VEVENT').slice(1).forEach(bl=>{ const b=bl.split('END:VEVENT')[0];
+    const sm=(b.match(/^SUMMARY[^:]*:(.+)$/m)||[])[1]||'';
+    const ds=b.match(/DTSTART[^:]*:(\d{8})(T(\d{2})(\d{2}))?/), de=b.match(/DTEND[^:]*:(\d{8})/);
+    if(ds) evs.push({s:ds[1], e:de?de[1]:null, sm, timed:!!ds[2], hh:ds[3], mm:ds[4]}); });
+  // find the school-year window from first/last day events (fallback: around now)
+  let first='', last='';
+  evs.forEach(v=>{ if(FIRSTre.test(v.sm)) first=first?first:iso(v.s); if(LASTre.test(v.sm)) last=iso(v.s); });
+  const now=new Date(); const win0=first||new Date(now.getFullYear(), now.getMonth()-1,1).toISOString().slice(0,10);
+  const win1=last||new Date(now.getFullYear()+1, now.getMonth(),1).toISOString().slice(0,10);
+  const inr=d=>d>=win0 && d<=win1;
+  function expand(s,e){ const sd=new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8));
+    const ed=e?new Date(+e.slice(0,4),+e.slice(4,6)-1,+e.slice(6,8)):new Date(sd.getTime()+864e5);
+    const out=[]; let cur=new Date(sd),g=0; while(cur<ed && g++<40){ out.push(cur.toISOString().slice(0,10)); cur=new Date(cur.getTime()+864e5);} return out; }
+  function clean(s){ s=s.replace(/\s*\(.*?\)/,'').trim().replace(/^No School\s*-\s*/i,'').replace(/^No School\s*$/i,'No school');
+    if(/Thanksgiving Break/i.test(s)) s='Thanksgiv.'; else if(/Winter Break|Spring Break/i.test(s)) s='Break'; return s.slice(0,12); }
+  const holidays={}, minimum=new Set(), events={};
+  const addEvent=(d,title)=>{ if(!events[d]) events[d]=[]; if(events[d].length<8 && !events[d].some(x=>x.t===title)) events[d].push({t:title}); };
+  evs.forEach(v=>{ if(!inr(iso(v.s))) return;
+    if(MIN.test(v.sm)) expand(v.s,v.e).forEach(d=>{ if(inr(d)) minimum.add(d); });
+    else if(NO.test(v.sm)) expand(v.s,v.e).forEach(d=>{ if(inr(d)) holidays[d]=clean(v.sm); });
+    // ALL events (for per-day display): timed = start day only; all-day = each covered day
+    const title=v.sm.slice(0,60);
+    const days=v.timed?[iso(v.s)]:expand(v.s,v.e);
+    days.forEach(d=>{ if(inr(d)) addEvent(d,title); });
+  });
+  return { first:first||win0, last:last||win1, holidays, minimumDays:[...minimum].sort(), events };
+}
+function parseSchedule(text,fname){
+  text=(text||'').trim();
+  if((fname||'').toLowerCase().endsWith('.ics') || /BEGIN:VCALENDAR/i.test(text)) return parseICS(text);
+  if((fname||'').toLowerCase().endsWith('.json') || text[0]==='{'){
+    const o=JSON.parse(text);
+    return { first:o.first||'', last:o.last||'', subtitle:o.subtitle||'',
+      holidays:o.holidays||{}, minimumDays:Array.isArray(o.minimumDays)?o.minimumDays:[],
+      events:o.events||{} };
+  }
+  const out={first:'',last:'',holidays:{},minimumDays:[]};
+  text.split(/\r?\n/).forEach((ln,i)=>{
+    const p=ln.split(',').map(s=>s.trim()); if(!p[0]) return;
+    if(i===0 && /date/i.test(p[0])) return;                    // header row
+    const date=p[0], t=(p[1]||'').toLowerCase(), label=p[2]||'';
+    if(!DATE_RE.test(date)) return;
+    if(t==='holiday'||t==='no-school'||t==='noschool') out.holidays[date]=label||'No school';
+    else if(t==='minimum'||t==='min'||t==='early') out.minimumDays.push(date);
+    else if(t==='first'||t==='start') out.first=date;
+    else if(t==='last'||t==='end') out.last=date;
+  });
+  return out;
+}
+function onSchedFile(ev){
+  const f=ev.target.files&&ev.target.files[0]; const prev=document.getElementById('schedPreview');
+  const save=document.getElementById('saveSched'); const m=document.getElementById('smsg'); m.className='msg'; m.textContent='';
+  if(!f){ return; }
+  const rd=new FileReader();
+  rd.onload=()=>{ try{
+    parsedSchedule=parseSchedule(rd.result,f.name);
+    const hn=Object.keys(parsedSchedule.holidays||{}).length, mn=(parsedSchedule.minimumDays||[]).length;
+    prev.innerHTML='Parsed: <b>'+esc(parsedSchedule.first||'?')+'</b> → <b>'+esc(parsedSchedule.last||'?')+'</b><br>'+
+      hn+' no-school days · '+mn+' minimum days';
+    save.disabled=false;
+  }catch(e){ parsedSchedule=null; save.disabled=true; prev.textContent=''; m.className='msg err'; m.textContent='Could not parse file: '+(e.message||''); } };
+  rd.readAsText(f);
+}
+function saveSchedule(){
+  if(!parsedSchedule){ return; }
+  const m=document.getElementById('smsg'); m.className='msg'; m.textContent='Saving…';
+  const events=parsedSchedule.events||{};
+  const sched={ first:parsedSchedule.first, last:parsedSchedule.last,
+    holidays:parsedSchedule.holidays||{}, minimumDays:parsedSchedule.minimumDays||[],
+    subtitle:parsedSchedule.subtitle||'', by:user.uid, ts:Date.now() };
+  Promise.all([ dref('config/schedule').set(sched), dref('config/events').set(events) ])
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  calendar rebuilt · '+Object.keys(events).length+' days with school events.'; })
+    .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+}
+function downloadTemplate(){
+  const csv='date,type,label\n'+
+    '2026-08-11,first,First day of school\n'+
+    '2027-06-01,last,Last day of school\n'+
+    '2026-09-07,holiday,Labor Day\n'+
+    '2026-11-26,holiday,Thanksgiving\n'+
+    '2026-08-11,minimum,Minimum day\n';
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='bell-schedule-template.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+function doLogin(){
+  const email=document.getElementById('email').value.trim();
+  const pass=document.getElementById('pass').value;
+  const m=document.getElementById('loginMsg'); m.className='msg'; m.textContent='';
+  if(!email||!pass){ m.className='msg err'; m.textContent='Enter email and password.'; return; }
+  auth.signInWithEmailAndPassword(email,pass).catch(e=>{ m.className='msg err'; m.textContent=(e.message||'Login failed').replace('Firebase: ',''); });
+}
+function saveHeader(){
+  const org=document.getElementById('fOrg').value.trim();
+  const title=document.getElementById('fTitle').value.trim();
+  const subtitle=document.getElementById('fSub').value.trim();
+  const schoolUrl=document.getElementById('fUrl').value.trim();
+  const whatsapp=document.getElementById('fWa').value.trim();
+  const m=document.getElementById('hmsg'); m.className='msg'; m.textContent='Saving…';
+  dref('config/header').set({org,title,subtitle,schoolUrl,whatsapp,by:user.uid,ts:Date.now()})
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  (open the calendar to see it)'; })
+    .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+}
+</script>
+</body>
+</html>

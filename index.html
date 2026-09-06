@@ -153,7 +153,22 @@
   .visitcount.onlinenow{border-color:rgba(34,197,94,.45);}
 
   /* Toolbar */
-  .toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px;flex-wrap:wrap;}
+  /* Masthead (sticky top nav) */
+  .masthead{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px;
+    margin:-20px -14px 16px;padding:9px 14px;
+    background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+    border-bottom:1px solid var(--line);box-shadow:0 4px 16px -12px rgba(16,24,40,.3);}
+  .masthead .brand{flex:none;display:flex;align-items:center;gap:5px;text-decoration:none;
+    font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:16px;color:var(--ink);}
+  .masthead .brand span{background:linear-gradient(120deg,var(--venu),var(--kumar));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .toolbar{display:flex;gap:8px;align-items:center;flex:1;min-width:0;
+    overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:thin;
+    scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+  .toolbar::-webkit-scrollbar{height:5px;}
+  .toolbar::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+  .toolbar .btn,.toolbar .authbadge{flex:none;scroll-snap-align:start;}
+  @media print{ .masthead{display:none;} }
   .btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;
     color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:20px;
     padding:7px 14px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);
@@ -247,6 +262,7 @@
   .rider .rwith{font-size:11px;color:var(--sub);font-weight:500;margin-top:2px;}
   .rider .rbday{font-size:11px;font-weight:700;color:#DB2777;margin-top:3px;}
   .rider .av.photo{background-size:cover;background-position:center;color:transparent;cursor:zoom-in;}
+  .rider .av.photo .av-init{opacity:0;}
   /* photo petals */
   .petal.petal-img{border-radius:50%;background-size:cover;background-position:center;
     border:2px solid rgba(255,255,255,.92);box-shadow:0 2px 7px rgba(16,24,40,.28);}
@@ -270,6 +286,11 @@
     cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;
     box-shadow:0 2px 6px -3px rgba(16,24,40,.4);}
   .rider .kphoto-btn:hover{border-color:var(--venu);}
+  .rider .kdob-btn{position:absolute;top:6px;right:34px;width:24px;height:24px;border-radius:8px;
+    border:1px solid var(--line);background:var(--card);font-size:12px;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;
+    box-shadow:0 2px 6px -3px rgba(16,24,40,.4);}
+  .rider .kdob-btn:hover{border-color:var(--charan);}
   .cell.bday{box-shadow:inset 0 0 0 2px #DB2777;}
   .cell .bday-flag{position:absolute;top:2px;left:3px;font-size:9px;line-height:1;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.25));}
@@ -487,7 +508,7 @@
   .swapcard{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;
     background:var(--card);border:1px solid var(--line);margin-bottom:9px;position:relative;overflow:hidden;}
   .swapcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sc,#F59E0B);}
-  .swapcard.open{--sc:#F59E0B;} .swapcard.covered{--sc:#22C55E;} .swapcard.past{--sc:#94A3B8;opacity:.7;}
+  .swapcard.open{--sc:#F59E0B;} .swapcard.proposed{--sc:#C2620A;} .swapcard.covered{--sc:#22C55E;} .swapcard.past{--sc:#94A3B8;opacity:.7;}
   .swapcard .sc-av{width:34px;height:34px;flex:none;border-radius:50%;display:flex;align-items:center;
     justify-content:center;color:#fff;font-weight:700;font-size:14px;font-family:'Fraunces',Georgia,serif;background:var(--scg,#94A3B8);}
   .swapcard .sc-info{flex:1;min-width:0;}
@@ -532,6 +553,49 @@
     box-shadow:0 1px 2px rgba(16,24,40,.04);margin-top:10px;}
   .countchip b{color:var(--ink);font-weight:800;}
   .countchip .cc-em{font-size:14px;}
+  /* Birthday greeting */
+  .bday-greeting{position:relative;overflow:hidden;border-radius:18px;padding:16px 46px 16px 18px;
+    margin-bottom:16px;color:#fff;background:linear-gradient(120deg,#7C3AED,#DB2777 52%,#EA580C);
+    box-shadow:0 14px 34px -16px rgba(219,39,119,.6);animation:riseIn .6s cubic-bezier(.2,.7,.3,1) both;}
+  .bday-greeting .bg-title{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:600;line-height:1.15;}
+  .bday-greeting .bg-sub{font-size:13px;opacity:.96;margin-top:4px;}
+  .bday-greeting .bg-emoji{font-size:20px;animation:bwiggle 1.4s ease-in-out infinite;display:inline-block;}
+  @keyframes bwiggle{0%,100%{transform:rotate(-12deg) scale(1)}50%{transform:rotate(12deg) scale(1.15)}}
+  .bday-greeting .bg-close{position:absolute;top:12px;right:12px;width:27px;height:27px;border:none;
+    background:rgba(255,255,255,.22);color:#fff;border-radius:9px;font-size:17px;line-height:1;cursor:pointer;}
+  .bday-greeting .bg-close:hover{background:rgba(255,255,255,.35);}
+  #confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:10055;}
+  /* School event indicator + day popup */
+  .cell .ev-mark{position:absolute;left:1px;right:1px;bottom:1px;font-size:8px;line-height:1.2;
+    font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
+    border-radius:4px;padding:1px 3px;letter-spacing:-.01em;
+    background:rgba(14,165,233,.18);color:#075985;}
+  .cell.school .ev-mark{background:rgba(255,255,255,.28);color:#fff;}
+  .cell.holiday .ev-mark{background:rgba(14,165,233,.14);color:#0369A1;}
+  .swap-toast{position:fixed;top:64px;right:14px;z-index:10001;max-width:290px;line-height:1.35;
+    background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+    border:1px solid var(--glass-brd);border-radius:14px;padding:11px 14px;font-size:12.5px;cursor:pointer;
+    box-shadow:0 16px 40px -16px rgba(16,24,40,.5);display:flex;gap:10px;align-items:flex-start;
+    transform:translateX(120%);animation:swToastIn .4s cubic-bezier(.2,.9,.3,1) forwards;}
+  .swap-toast b{color:var(--ink);}
+  .swap-toast.out{animation:swToastOut .35s ease forwards;}
+  @keyframes swToastIn{to{transform:translateX(0);}}
+  @keyframes swToastOut{to{transform:translateX(120%);opacity:0;}}
+  @media (max-width:520px){.swap-toast{left:12px;right:12px;max-width:none;}}
+  .cell .swap-ind{position:absolute;top:2px;left:3px;font-size:9px;font-weight:800;color:#fff;
+    background:rgba(0,0,0,.28);border-radius:5px;padding:0 3px;line-height:1.35;}
+  .cell.swapped{box-shadow:inset 0 0 0 2px rgba(255,255,255,.6);}
+  .cell .who{margin-top:1px;}                       /* nudge driver name up to make room */
+  .cell.school .who,.cell.holiday .who{margin-bottom:8px;}
+  .cell.early .fri-flag{display:none;}
+  .day-note{font-size:12.5px;margin:2px 0 12px;padding:8px 11px;border-radius:11px;
+    background:var(--paper);border:1px solid var(--line);color:var(--sub);line-height:1.45;}
+  .day-note b{color:var(--ink);}
+  .day-sec{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;}
+  .dayrow{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:11px;
+    background:var(--card);border:1px solid var(--line);margin-bottom:7px;}
+  .dayrow .de-ic{font-size:13px;flex:none;}
+  .dayrow .de-t{font-size:13px;color:var(--ink);line-height:1.35;}
 
   /* Falling flowers */
   .petals{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:9999;}
@@ -558,6 +622,27 @@
 </head>
 <body>
 <div class="wrap">
+  <div class="masthead">
+    <a class="brand" href="index.html">🚗 <span>Carpool</span></a>
+    <nav class="toolbar" aria-label="Actions">
+      <button class="authbadge" id="authBadge" type="button"><span class="ab-dot"></span><span id="abText">Log in</span></button>
+      <button class="btn" id="todayBtn" type="button">📍 Today</button>
+      <button class="btn" id="printBtn" type="button">🖨️ Print</button>
+      <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
+      <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
+      <button class="btn" id="contactBtn" type="button">📞 Contacts</button>
+      <button class="btn" id="whereBtn" type="button">🚗 Where?</button>
+      <button class="btn" id="liveBtn" type="button">📍 Live</button>
+      <button class="btn" id="logBtn" type="button">🕐 Times</button>
+      <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
+      <button class="btn" id="statsBtn" type="button">📊 Stats</button>
+      <button class="btn" id="chatBtn" type="button">💬 Chat</button>
+      <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
+      <a class="btn" id="adminBtn" href="admin.html">⚙️ Admin</a>
+      <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
+    </nav>
+  </div>
+
   <header class="top">
     <div class="eyebrow">Thornton Middle School · 2026–27</div>
     <h1>School Carpool</h1>
@@ -568,23 +653,6 @@
       <div class="visitcount onlinenow jsOnline"></div>
     </div>
   </header>
-
-  <div class="toolbar">
-    <button class="authbadge" id="authBadge" type="button"><span class="ab-dot"></span><span id="abText">Log in</span></button>
-    <button class="btn" id="todayBtn" type="button">📍 Today</button>
-    <button class="btn" id="printBtn" type="button">🖨️ Print</button>
-    <button class="btn" id="petalBtn" type="button">🌸 Flowers</button>
-    <button class="btn" id="alertBtn" type="button">🔔 Alerts</button>
-    <button class="btn" id="contactBtn" type="button">📞 Contacts</button>
-    <button class="btn" id="whereBtn" type="button">🚗 Where?</button>
-    <button class="btn" id="liveBtn" type="button">📍 Live</button>
-    <button class="btn" id="logBtn" type="button">🕐 Times</button>
-    <button class="btn" id="swapBtn" type="button">🔁 Swaps</button>
-    <button class="btn" id="statsBtn" type="button">📊 Stats</button>
-    <button class="btn" id="chatBtn" type="button">💬 Chat</button>
-    <button class="btn" id="installBtn" type="button" style="display:none">📲 Install</button>
-    <button class="btn" id="themeBtn" type="button">🌙 Dark</button>
-  </div>
 
   <div class="overlay" id="contactOverlay" role="dialog" aria-modal="true" aria-label="Driver contacts">
     <div class="modal" id="contactModal"></div>
@@ -602,6 +670,10 @@
     <div class="modal" id="swapModal"></div>
   </div>
 
+  <div class="overlay" id="swapReqOverlay" role="dialog" aria-modal="true" aria-label="Swap request">
+    <div class="modal" id="swapReqModal"></div>
+  </div>
+
   <div class="overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-label="Driving stats">
     <div class="modal" id="statsModal"></div>
   </div>
@@ -614,6 +686,10 @@
     <div class="modal" id="logModal"></div>
   </div>
 
+  <div class="overlay" id="dayOverlay" role="dialog" aria-modal="true" aria-label="Day details">
+    <div class="modal" id="dayModal"></div>
+  </div>
+
   <div class="alerts" id="alerts" aria-live="polite"></div>
   <div class="petals" id="petals" aria-hidden="true"></div>
 
@@ -622,24 +698,7 @@
   <div class="riders">
     <h2>🎒 Our Carpool Kids</h2>
     <div class="rcaption">Four riders, one carpool — whoever drives that day takes the whole crew.</div>
-    <div class="rider-grid">
-      <div class="rider" style="--rg:linear-gradient(150deg,#A78BFA,#6D28D9);--rc:#7C3AED">
-        <div class="av">K<span class="spark">🌟</span></div>
-        <div class="rtxt"><div class="rname">Kundana</div></div>
-      </div>
-      <div class="rider" style="--rg:linear-gradient(150deg,#F472B6,#BE185D);--rc:#DB2777">
-        <div class="av">K<span class="spark">🌸</span></div>
-        <div class="rtxt"><div class="rname">Krupa</div></div>
-      </div>
-      <div class="rider" style="--rg:linear-gradient(150deg,#22D3EE,#0E7490);--rc:#0891B2">
-        <div class="av">I<span class="spark">🦋</span></div>
-        <div class="rtxt"><div class="rname">Ishanvi</div></div>
-      </div>
-      <div class="rider" style="--rg:linear-gradient(150deg,#FBBF24,#D97706);--rc:#EA580C">
-        <div class="av">S<span class="spark">🌈</span></div>
-        <div class="rtxt"><div class="rname">Srininidhi</div></div>
-      </div>
-    </div>
+    <div class="rider-grid" id="riderGrid"></div>
   </div>
 
   <div class="legend" id="legend">
@@ -676,8 +735,8 @@ const CONTACTS = {
   'Kumar':  ''
 };
 // Paste your WhatsApp group invite link here (https://chat.whatsapp.com/....) or leave '' :
-const GROUP_WHATSAPP = '';
-const SCHOOL_URL = 'https://fremontunified.org/thornton/';
+let GROUP_WHATSAPP = '';                                    // admin-configurable
+let SCHOOL_URL = 'https://fremontunified.org/thornton/';    // admin-configurable
 
 /* ===== EDIT HERE: auto-record windows (24-hour HH:MM). On minimum days the
    afternoon automatically uses minDayAfternoon instead of afternoon. */
@@ -687,14 +746,27 @@ const RECORD_WINDOWS = {
   minDayAfternoon: { start:'12:00', end:'13:00', label:'Afternoon (minimum day)' }
 };
 
-/* ===== EDIT HERE: kids' birthdays. month = 1-12, day = 1-31. year optional (shows age).
-   photo optional: a file you add to the repo (e.g. 'kundana.jpg') or a data: URI. */
-const BIRTHDAYS = {
-  'Kundana':    { month:11, day:10, year:null, photo:'' },
-  'Krupa':      { month:0,  day:0,  year:null, photo:'' },
-  'Ishanvi':    { month:0,  day:0,  year:null, photo:'' },
-  'Srininidhi': { month:0,  day:0,  year:null, photo:'' }
-};
+/* ===== EDIT HERE: the carpool kids — one place for name, colors, birthday.
+   To rename a kid, add one, or set a birthday, edit ONLY this list.
+   birthday: month 1-12, day 1-31 (0/0 = unknown); year optional (shows age). */
+const KIDS = [
+  { name:'Kundana', spark:'🌟', from:'#A78BFA', to:'#6D28D9', accent:'#7C3AED', birthday:{month:11, day:10, year:null} },
+  { name:'Krupa',   spark:'🌸', from:'#F472B6', to:'#BE185D', accent:'#DB2777', birthday:{month:0,  day:0,  year:null} },
+  { name:'Ishanvi', spark:'🦋', from:'#22D3EE', to:'#0E7490', accent:'#0891B2', birthday:{month:0,  day:0,  year:null} },
+  { name:'Srinidhi',spark:'🌈', from:'#FBBF24', to:'#D97706', accent:'#EA580C', birthday:{month:7,  day:17, year:null} }
+];
+// derived: birthdays keyed by name (used by alerts / countdown / calendar) — do not edit
+const BIRTHDAYS = Object.fromEntries(KIDS.map(k=>[k.name,{...k.birthday,photo:''}]));
+// build the "Our Carpool Kids" card from the KIDS config
+(function renderKids(){
+  const grid=document.getElementById('riderGrid'); if(!grid) return;
+  grid.innerHTML=KIDS.map(k=>{
+    const initial=(k.name.trim()[0]||'?');
+    return `<div class="rider" style="--rg:linear-gradient(150deg,${k.from},${k.to});--rc:${k.accent}">`+
+      `<div class="av"><span class="av-init">${initial}</span><span class="spark">${k.spark}</span></div>`+
+      `<div class="rtxt"><div class="rname">${k.name}</div></div></div>`;
+  }).join('');
+})();
 
 /* ===== EDIT HERE: paste your Firebase project config (Console → Project settings → Web app)
    These values are safe to be public. Live tracking stays disabled until apiKey is filled. */
@@ -716,13 +788,13 @@ const FRIDAY = {
   '2026-09-04':'Kumar','2026-10-02':'Kumar','2026-11-06':'Kumar','2026-12-18':'Kumar','2027-01-29':'Kumar','2027-03-05':'Kumar','2027-04-23':'Kumar','2027-05-21':'Kumar'
 };
 
-const FIRST='2026-08-11', LAST='2027-06-01';
+let FIRST='2026-08-11', LAST='2027-06-01';   // admin-configurable (bell schedule)
 // Use the real current date so "Today" reflects reality
 const _now=new Date();
 const TODAY=`${_now.getFullYear()}-${pad0(_now.getMonth()+1)}-${pad0(_now.getDate())}`;
 function pad0(n){return String(n).padStart(2,'0');}
 
-const NO_SCHOOL={
+let NO_SCHOOL={
   '2026-09-07':'Labor Day','2026-10-23':'Conf.','2026-11-11':'Veterans','2026-11-20':'Conf.',
   '2026-11-23':'Recess','2026-11-24':'Recess','2026-11-25':'Recess','2026-11-26':'Thanksgiv.','2026-11-27':'Recess',
   '2026-12-21':'Break','2026-12-22':'Break','2026-12-23':'Break','2026-12-24':'Break','2026-12-25':'Break',
@@ -731,16 +803,23 @@ const NO_SCHOOL={
   '2027-03-15':'Break','2027-03-16':'Break','2027-03-17':'Break','2027-03-18':'Break','2027-03-19':'Break',
   '2027-03-26':'Staff','2027-05-31':'Memorial'
 };
-const EARLY=new Set(['2026-08-11','2026-09-04','2026-10-21','2026-10-22','2026-11-19','2026-12-18','2027-01-15','2027-02-11','2027-03-11','2027-05-28','2027-06-01']);
+let EARLY=new Set(['2026-08-11','2026-09-04','2026-10-21','2026-10-22','2026-11-19','2026-12-18','2027-01-15','2027-02-11','2027-03-11','2027-05-28','2027-06-01']);
 
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW=['S','M','T','W','T','F','S'];
 const pad=n=>String(n).padStart(2,'0');
 const iso=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
 
+let SWAP_OVERRIDES={};   // date -> {name, from, slot} for covered swaps (signed-in only)
+function monthSeq(){ // [year, monthIndex] from FIRST's month through LAST's month
+  const [fy,fm]=FIRST.split('-').map(Number), [ly,lm]=LAST.split('-').map(Number);
+  const seq=[]; let y=fy, m=fm-1; let guard=0;
+  while((y<ly || (y===ly && m<=lm-1)) && guard++<60){ seq.push([y,m]); m++; if(m>11){m=0;y++;} }
+  return seq;
+}
 function build(){
   const cal=document.getElementById('cal');
-  const seq=[[2026,7],[2026,8],[2026,9],[2026,10],[2026,11],[2027,0],[2027,1],[2027,2],[2027,3],[2027,4],[2027,5]];
+  const seq=monthSeq();
   seq.forEach(([y,m])=>{
     const month=document.createElement('div');month.className='month';
     month.innerHTML=`<div class="m-head"><span class="m-name">${MONTHS[m]}</span><span class="m-year">${y}</span></div>`+
@@ -753,18 +832,27 @@ function build(){
       const date=iso(y,m,d), wd=new Date(y,m,d).getDay();
       const cell=document.createElement('div');
       const inRange=date>=FIRST&&date<=LAST;
-      let cls='cell', who='', friTag=false, driver='';
+      let cls='cell', who='', friTag=false, driver='', swapped=false;
       if(!inRange){ cls+=(wd===0||wd===6)?' weekend':' blank'; }
       else if(wd===0||wd===6){ cls+=' weekend'; }
       else if(NO_SCHOOL[date]){ cls+=' holiday'; who=NO_SCHOOL[date]; }
-      else if(wd===5){ const p=FRIDAY[date]; if(p){ cls+=' school friday '+PCLASS[p]; who=p; driver=p; friTag=true; } else { cls+=' holiday'; who='—'; } }
-      else { cls+=' school '+PCLASS[WEEK[wd]]; who=WEEK[wd]; driver=WEEK[wd]; }
+      else if(wd===5){ const p=FRIDAY[date]; if(p){ driver=p; friTag=true; } else { cls+=' holiday'; who='—'; } }
+      else { driver=WEEK[wd]; }
+      // covered-swap override: the covering driver takes this day
+      if(driver && SWAP_OVERRIDES[date] && SWAP_OVERRIDES[date].name && PCLASS[SWAP_OVERRIDES[date].name]){
+        swapped=true; driver=SWAP_OVERRIDES[date].name;
+      }
+      if(driver){ cls+=' school '+(friTag?'friday ':'')+PCLASS[driver]; who=driver; }
       if(EARLY.has(date)) cls+=' early';
+      if(swapped) cls+=' swapped';
       if(date===TODAY) cls+=' today';
       cell.className=cls;
       cell.dataset.date=date;
       if(driver) cell.dataset.person=driver;
-      cell.innerHTML=`<span class="num">${d}</span>`+(who?`<span class="who">${who}</span>`:'')+(friTag?`<span class="fri-flag">FRI</span>`:'')+(date===TODAY?`<span class="today-car">🚗</span>`:'');
+      let extra=(date===TODAY?`<span class="today-car">🚗</span>`:'');
+      if(swapped){ const ov=SWAP_OVERRIDES[date];
+        extra+=`<span class="swap-ind" title="Swap: ${esc(ov.from||'')} → ${esc(driver)} (${esc(ov.slot||'Both')})">⇄</span>`; }
+      cell.innerHTML=`<span class="num">${d}</span>`+(who?`<span class="who">${who}</span>`:'')+(friTag?`<span class="fri-flag">FRI</span>`:'')+extra;
       grid.appendChild(cell);
     }
     month.appendChild(grid);cal.appendChild(month);
@@ -845,31 +933,34 @@ function nextBirthdayInfo(b){
   const age=b.year?(d.getFullYear()-b.year):null;
   return {iso,days,age,label:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})};
 }
-// show birthday date (+ photo) on each Kids card
-document.querySelectorAll('.rider').forEach(r=>{
-  const nameEl=r.querySelector('.rname'); if(!nameEl) return;
-  const name=nameEl.textContent.trim();
-  const b=BIRTHDAYS[name]; const info=nextBirthdayInfo(b);
+// show birthday date on one Kids card (re-runnable when DOB changes)
+function renderKidBirthday(name){
+  const r=[...document.querySelectorAll('.rider')].find(x=>{const n=x.querySelector('.rname');return n&&n.textContent.trim()===name;});
+  if(!r) return;
+  const old=r.querySelector('.rbday'); if(old) old.remove();
+  const info=nextBirthdayInfo(BIRTHDAYS[name]);
   if(info){
     const line=document.createElement('div'); line.className='rbday';
     line.innerHTML=`🎂 ${info.label}${info.age?` · turns ${info.age}`:''}`;
     (r.querySelector('.rtxt')||r).appendChild(line);
   }
-  if(b&&b.photo){
-    const av=r.querySelector('.av');
-    if(av){av.style.backgroundImage=`url('${b.photo}')`;av.classList.add('photo');av.textContent='';}
-  }
-});
-// birthday badge on the calendar date
-document.querySelectorAll('.cell[data-date]').forEach(c=>{
-  const [Y,M,D]=c.dataset.date.split('-').map(Number);
-  for(const nm in BIRTHDAYS){const b=BIRTHDAYS[nm];
-    if(b&&b.month===M&&b.day===D){
-      c.classList.add('bday'); c.title=`🎂 ${nm}'s birthday`;
-      const f=document.createElement('span'); f.className='bday-flag'; f.textContent='🎂';
-      c.appendChild(f); break;
-    }}
-});
+}
+// birthday badges on calendar dates (re-runnable)
+function renderBdayBadges(){
+  document.querySelectorAll('.cell.bday').forEach(c=>{ c.classList.remove('bday'); c.removeAttribute('title');
+    const f=c.querySelector('.bday-flag'); if(f) f.remove(); });
+  document.querySelectorAll('.cell[data-date]').forEach(c=>{
+    const [Y,M,D]=c.dataset.date.split('-').map(Number);
+    for(const nm in BIRTHDAYS){const b=BIRTHDAYS[nm];
+      if(b&&b.month===M&&b.day===D){
+        c.classList.add('bday'); c.title=`🎂 ${nm}'s birthday`;
+        const f=document.createElement('span'); f.className='bday-flag'; f.textContent='🎂';
+        c.appendChild(f); break;
+      }}
+  });
+}
+KIDS.forEach(k=>renderKidBirthday(k.name));
+renderBdayBadges();
 
 // ---- Person filter (tap legend chip) ----
 let activeFilter=null;
@@ -919,6 +1010,7 @@ document.getElementById('todayBtn').addEventListener('click',()=>{
 // ---- On load: show banner first, then slowly glide to today ----
 window.addEventListener('load',()=>{
   window.scrollTo(0,0); // start at the top so the banner is seen first
+  if(document.querySelector('.bday-greeting')) return; // birthday today — stay up to show the greeting 🎉
   const t=document.querySelector('.cell.today');
   if(!t) return;
   setTimeout(()=>slowScrollTo(t,2200),1300); // pause on banner, then drift down slowly
@@ -1201,6 +1293,77 @@ let myTrack=[], sessionId=null, trailLine=null, sessionRef=null;
     }
   }catch(e){console.warn('Firebase init failed:',e);}
 })();
+// Staging isolation: the /staging/ build reads & writes under a separate "stg/" subtree,
+// so testing never touches production data. (.info/* paths must NOT be prefixed.)
+const DB_PREFIX = (location.pathname.indexOf('/staging/')>=0) ? 'stg/' : '';
+function dref(p){ return fbDb.ref(DB_PREFIX+p); }
+
+/* =====================================================================
+   REUSABLE APP CORE  —  clean API for current features + future Admin page.
+   Everything below is prefix-aware (staging writes under stg/) and safe to
+   reuse anywhere. Prefer these over touching firebase directly.
+   ===================================================================== */
+const DB = {
+  ready:   ()=>fbOK,
+  ref:     (p)=>dref(p),                 // prefixed ref
+  raw:     (p)=>fbDb.ref(p),             // UNprefixed (only for .info/*)
+  get:     (p)=>dref(p).once('value').then(s=>s.val()),
+  set:     (p,v)=>dref(p).set(v),
+  update:  (p,v)=>dref(p).update(v),
+  push:    (p,v)=>dref(p).push(v),
+  remove:  (p)=>dref(p).remove(),
+  txn:     (p,fn)=>dref(p).transaction(fn),
+  // subscribe to a value; returns an unsubscribe fn
+  on:      (p,cb,err)=>{const r=dref(p); const h=r.on('value',s=>cb(s.val(),s),err); return ()=>r.off('value',h);},
+  // subscribe to a collection as an array of {id,...}; returns unsubscribe
+  onList:  (p,cb,err)=>{const r=dref(p); const h=r.on('value',s=>{const o=s.val()||{}; cb(Object.entries(o).map(([id,v])=>({id,...(v&&typeof v==='object'?v:{value:v})})), s);},err); return ()=>r.off('value',h);},
+  prefix:  ()=>DB_PREFIX
+};
+const Auth = {
+  ready:    ()=>fbOK,
+  user:     ()=>currentUser,
+  signedIn: ()=>!!currentUser,
+  uid:      ()=>currentUser&&currentUser.uid,
+  name:     ()=>currentUser?((currentUser.displayName)||(currentUser.email||'Driver').split('@')[0]):null,
+  onChange: (cb)=>{ if(fbOK) fbAuth.onAuthStateChanged(cb); },
+  signIn:   (email,pw)=>fbAuth.signInWithEmailAndPassword(email,pw),
+  signUp:   (email,pw,name)=>fbAuth.createUserWithEmailAndPassword(email,pw).then(c=>c.user.updateProfile({displayName:name})),
+  signOut:  ()=>fbAuth.signOut()
+};
+// date/format helpers (thin, reference the hoisted utilities)
+const Fmt = {
+  day:  (d)=>fmtDay(d),        // "Monday, Sep 7"
+  rel:  (d)=>relDay(d),        // "today" / "tomorrow" / "on Monday"
+  time: (ts)=>hhmm(ts),        // "7:32 AM"
+  dur:  (ms)=>durText(ms),     // "1h 30m"
+  ago:  (ts)=>agoText(ts),     // "5 min ago"
+  isoToday: ()=>TODAY,
+  addDays: (d,n)=>addDays(d,n),
+  esc:  (s)=>esc(s)
+};
+// generic modal controller for NEW panels (e.g. the Admin page).
+// Reuses the existing .overlay/.modal styles. onClose runs on any close.
+const UI = {
+  esc: (s)=>esc(s),
+  el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; },
+  openModal(overlayId, innerHTML, title, opts={}){
+    const ov=document.getElementById(overlayId); if(!ov) return null;
+    const modal=ov.querySelector('.modal'); if(!modal) return null;
+    modal.innerHTML=`<button class="mclose" type="button" aria-label="Close">×</button>`+(title?`<h2>${title}</h2>`:'')+(innerHTML||'');
+    ov.__onClose=opts.onClose||null;
+    modal.querySelector('.mclose').addEventListener('click',()=>UI.closeModal(overlayId));
+    if(!ov.__wired){ ov.__wired=true;
+      ov.addEventListener('click',e=>{ if(e.target===ov) UI.closeModal(overlayId); });
+    }
+    ov.classList.add('open');
+    return modal;
+  },
+  closeModal(overlayId){
+    const ov=document.getElementById(overlayId); if(!ov) return;
+    ov.classList.remove('open');
+    if(typeof ov.__onClose==='function'){ try{ov.__onClose();}catch(_){} }
+  }
+};
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -1320,7 +1483,7 @@ function initMap(){
   setTimeout(()=>map&&map.invalidateSize(),120);
 }
 function listenLocations(){
-  locRef=fbDb.ref('locations');
+  locRef=dref('locations');
   locRef.on('value',snap=>{
     const data=snap.val()||{};
     const now=Date.now(), fresh={};
@@ -1431,11 +1594,11 @@ function startSharing(){
   const btn=liveModal.querySelector('#liveToggle');
   btn.textContent='⏸️ Stop sharing'; btn.classList.add('stop');
   liveModal.querySelector('#geoText').textContent='Locating…';
-  const myRef=fbDb.ref('locations/'+currentUser.uid);
+  const myRef=dref('locations/'+currentUser.uid);
   myRef.onDisconnect().remove();
   // begin a recording session
   sessionId=Date.now(); myTrack=[];
-  sessionRef=fbDb.ref('tracks/'+currentUser.uid+'/'+sessionId);
+  sessionRef=dref('tracks/'+currentUser.uid+'/'+sessionId);
   sessionRef.child('meta').set({name:myName,start:sessionId});
   watchId=navigator.geolocation.watchPosition(pos=>{
     const {latitude:lat,longitude:lng,accuracy:ac}=pos.coords;
@@ -1454,7 +1617,7 @@ function startSharing(){
 }
 function stopSharing(){
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
-  if(fbDb&&currentUser){fbDb.ref('locations/'+currentUser.uid).remove();}
+  if(fbDb&&currentUser){dref('locations/'+currentUser.uid).remove();}
   if(sessionRef){sessionRef.child('meta/end').set(Date.now());sessionRef=null;} // close recording
   const btn=liveModal.querySelector('#liveToggle');
   if(btn){btn.textContent='▶️ Share my live location';btn.classList.remove('stop');}
@@ -1546,7 +1709,7 @@ function initWhereMap(){
   setTimeout(()=>whereMap&&whereMap.invalidateSize(),120);
 }
 function listenWhere(){
-  whereRef=fbDb.ref('locations');
+  whereRef=dref('locations');
   whereRef.on('value',snap=>{
     const data=snap.val()||{}, now=Date.now();
     // pick the most-recent fresh sharer = the active car
@@ -1633,7 +1796,7 @@ function renderLog(dateStr){
   cleanupRouteMap();
   const list=logModal.querySelector('#logList');
   if(list) list.innerHTML=`<div class="where-empty">Loading…</div>`;
-  fbDb.ref('tracks').once('value').then(snap=>{
+  dref('tracks').once('value').then(snap=>{
     const data=snap.val()||{}, rows=[];
     Object.entries(data).forEach(([uid,sessions])=>{
       Object.entries(sessions||{}).forEach(([sid,sess])=>{
@@ -1683,7 +1846,7 @@ function showTrackRoute(r){
       `<div class="uprog" id="uProg"><span></span></div></div>`+
     `<div id="routeMsg" class="ltime" style="text-align:center;margin-top:8px">Loading route…</div>`;
   list.querySelector('#logBack').addEventListener('click',()=>renderLog(logDateSel));
-  fbDb.ref('tracks/'+r.uid+'/'+r.sid+'/points').once('value').then(snap=>{
+  dref('tracks/'+r.uid+'/'+r.sid+'/points').once('value').then(snap=>{
     const pts=[],tss=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&typeof v.lat==='number'){pts.push([v.lat,v.lng]);tss.push(v.ts||0);}});
     const msg=logModal.querySelector('#routeMsg');
     if(!window.L){ if(msg) msg.textContent='Map library not loaded.'; return; }
@@ -1760,11 +1923,51 @@ function closeLog(){ cleanupRouteMap(); logOverlay.classList.remove('open'); }
 document.getElementById('logBtn').addEventListener('click',()=>openLog());
 logOverlay.addEventListener('click',e=>{if(e.target===logOverlay)closeLog();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLog();});
-// Tap any calendar date to see that day's track log
+// Tap any calendar date to see that day's details (school events + carpool)
 document.getElementById('cal').addEventListener('click',e=>{
   const c=e.target.closest('.cell[data-date]'); if(!c) return;
-  openLog(c.dataset.date);
+  openDay(c.dataset.date);
 });
+
+// ---- School events per day (from config/events) ----
+let SCHOOL_EVENTS={};
+function applyEventDots(){
+  document.querySelectorAll('.cell .ev-mark').forEach(d=>d.remove());
+  document.querySelectorAll('.cell[data-date]').forEach(c=>{
+    const evs=SCHOOL_EVENTS[c.dataset.date];
+    if(evs && evs.length){
+      const first=String(evs[0].t||evs[0]||'').replace(/\s*@.*$/,'').replace(/\s*\(.*$/,'').trim();
+      const m=document.createElement('span'); m.className='ev-mark';
+      m.textContent = evs.length>1 ? (first+' +'+(evs.length-1)) : first;
+      m.title = evs.map(e=>e.t||e).join(' · ');
+      c.appendChild(m);
+    }
+  });
+}
+(function loadEventsConfig(){
+  if(!fbOK) return;
+  DB.on('config/events', ev=>{ SCHOOL_EVENTS=ev||{}; applyEventDots(); }, ()=>{});
+})();
+const dayOverlay=document.getElementById('dayOverlay');
+const dayModal=document.getElementById('dayModal');
+function openDay(date){
+  const events=SCHOOL_EVENTS[date]||[];
+  const driver=driverForDate(date);
+  const noSchool=NO_SCHOOL[date];
+  const early=EARLY.has(date);
+  let note='';
+  if(noSchool) note=`🏖️ <b>No school</b> — ${esc(noSchool)}`;
+  else if(driver) note=`🚗 <b>${esc(driver)}</b> drives${early?' · ⏰ minimum day, pickup 12:45 PM':' · pickup 2:00 PM'}`;
+  else note='Weekend / no carpool';
+  const evHtml = events.length
+    ? `<div class="day-sec">🏫 School events</div>`+events.map(e=>`<div class="dayrow"><span class="de-ic">📌</span><span class="de-t">${esc(e.t||e)}</span></div>`).join('')
+    : `<div class="day-sec">🏫 School events</div><div class="day-note">No school events on this day.</div>`;
+  const inner=`<div class="day-note">${note}</div>`+evHtml+
+    `<button class="mbtn maps" id="dayTimes">🕐 Carpool timings for this day</button>`;
+  UI.openModal('dayOverlay', inner, '📅 '+fmtDay(date));
+  const bt=dayModal.querySelector('#dayTimes');
+  if(bt) bt.addEventListener('click',()=>{ UI.closeModal('dayOverlay'); openLog(date); });
+}
 
 // ---- Swap Board ----
 const swapOverlay=document.getElementById('swapOverlay');
@@ -1787,60 +1990,93 @@ function openSwaps(){
   }
   const today=localDateStr(Date.now());
   swapShell(
-    `<div class="msub">Can’t drive your day? Post it — another family can cover.</div>`+
+    `<div class="msub">Can’t drive a day? Post the date + a note. Another driver picks one of <b>their</b> days to swap with you.</div>`+
     `<div class="swap-form">`+
+      `<label style="font-size:11px;font-weight:700;color:var(--sub)">Date you can’t drive</label>`+
       `<input class="finput" type="date" id="swDate" value="${today}" min="${today}">`+
       `<div class="row"><select class="fselect" id="swSlot">`+
-        `<option value="Both">Both ways</option><option value="Morning">Morning only</option><option value="Afternoon">Afternoon only</option></select></div>`+
+        `<option value="Both">Both ways</option><option value="Morning">Morning only</option><option value="Afternoon">Afternoon only</option></select>`+
+        `<select class="fselect" id="swReq"><option value="">Ask anyone</option>`+NAMES.map(n=>`<option value="${n}">Ask ${n}</option>`).join('')+`</select></div>`+
       `<input class="finput" id="swNote" type="text" placeholder="Note (optional) — e.g. early meeting" maxlength="80">`+
       `<button class="mbtn live" id="swPost">Post swap request</button>`+
     `</div>`+
     `<div id="swList"><div class="where-empty">Loading…</div></div>`);
   swapModal.querySelector('#swPost').addEventListener('click',postSwap);
   listenSwaps();
+  markSwapsSeen();
 }
 function postSwap(){
   const date=swapModal.querySelector('#swDate').value;
   const slot=swapModal.querySelector('#swSlot').value;
   const note=swapModal.querySelector('#swNote').value.trim();
+  const reqUser=(swapModal.querySelector('#swReq')||{}).value||'';
   if(!date){return;}
   const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
-  fbDb.ref('swaps').push({date,slot,note,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
+  dref('swaps').push({date,slot,note,requestUser:reqUser||null,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
     .then(()=>{swapModal.querySelector('#swNote').value='';})
     .catch(err=>alert('Could not post: '+(err.message||'')));
 }
-function claimSwap(id,s){
+// responder OFFERS a return date -> status 'proposed' (awaits requester approval)
+function proposeSwap(id,coverDate){
   const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
-  fbDb.ref('swaps/'+id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverTs:Date.now()})
-    .catch(err=>alert('Could not cover: '+(err.message||'')));
+  dref('swaps/'+id).update({status:'proposed',coverBy:currentUser.uid,coverName:nm,coverDate:coverDate||null,coverTs:Date.now()})
+    .catch(err=>alert('Could not offer: '+(err.message||'')));
 }
-function cancelSwap(id){ fbDb.ref('swaps/'+id).remove().catch(()=>{}); }
+// requester APPROVES the offer -> status 'covered' (reflects on calendar)
+function approveSwap(id){ dref('swaps/'+id).update({status:'covered',approvedTs:Date.now()}).catch(err=>alert('Could not approve: '+(err.message||''))); }
+function declineSwap(id){ dref('swaps/'+id).update({status:'open',coverBy:null,coverName:null,coverDate:null,coverTs:null}).catch(()=>{}); }
+function cancelSwap(id){ dref('swaps/'+id).remove().catch(()=>{}); }
 function listenSwaps(){
-  swapsRef=fbDb.ref('swaps');
+  swapsRef=dref('swaps');
   swapsRef.on('value',snap=>{
     const data=snap.val()||{}, today=localDateStr(Date.now());
     const rows=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    const open=rows.filter(r=>r.status!=='covered'&&r.date>=today);
-    const covered=rows.filter(r=>r.status==='covered'&&r.date>=today);
+    const st=r=>r.status||'open';
+    const open=rows.filter(r=>st(r)==='open'&&r.date>=today);
+    const proposed=rows.filter(r=>st(r)==='proposed'&&r.date>=today);
+    const covered=rows.filter(r=>st(r)==='covered'&&r.date>=today);
     const past=rows.filter(r=>r.date<today).slice(-5);
     const list=swapModal.querySelector('#swList'); if(!list) return;
+    const shortD=d=>{const dt=new Date(...String(d).split('-').map((v,i)=>i===1?v-1:+v));return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+    const uid=currentUser&&currentUser.uid;
     const card=r=>{
       const g=SGRAD[PCLASS[r.byName]]||'#94A3B8';
-      const cls=r.status==='covered'?'covered':(r.date<today?'past':'open');
-      const mine=r.by===currentUser.uid;
-      let action='';
-      if(cls==='open'&&!mine) action=`<button class="sc-act" data-claim="${r.id}">I’ll cover</button>`;
-      else if(cls==='open'&&mine) action=`<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`;
-      else if(cls==='covered') action=`<span class="sc-tag">✅ ${esc(r.coverName||'covered')}</span>`;
+      const s=st(r), mine=r.by===uid, iOffered=r.coverBy===uid;
+      const cls=s==='covered'?'covered':(s==='proposed'?'proposed':(r.date<today?'past':'open'));
+      let action='', sub='';
+      if(s==='open'){
+        action = mine ? `<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`
+                      : `<button class="sc-act" data-swap="${r.id}">🔁 Swap a date</button>`;
+        sub = `${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}${r.requestUser?` · asked ${esc(r.requestUser)}`:''}`;
+      } else if(s==='proposed'){
+        if(mine) action = `<span style="display:flex;gap:5px"><button class="sc-act" data-approve="${r.id}">✓ Approve</button><button class="sc-act cancel" data-decline="${r.id}">✕</button></span>`;
+        else action = `<span class="sc-tag" style="color:#C2620A">⏳ ${iOffered?'You offered':'Awaiting '+esc(r.byName||'')}</span>`;
+        sub = `${esc(r.coverName||'')} offers ${shortD(r.coverDate)} ↔ ${esc(r.byName||'')} ${shortD(r.date)}${mine?' — approve?':''}`;
+      } else if(s==='covered'){
+        action = `<span class="sc-tag">✅ done</span>`;
+        sub = `${esc(r.coverName||'')} takes ${shortD(r.date)}${r.coverDate?` · ${esc(r.byName||'')} takes ${shortD(r.coverDate)}`:''}`;
+      }
       return `<div class="swapcard ${cls}" style="--scg:${g}"><div class="sc-av">${esc((r.byName||'?')[0])}</div>`+
         `<div class="sc-info"><div class="sc-when">${esc(r.byName||'Driver')} · ${fmtDay(r.date)}</div>`+
-        `<div class="sc-sub">${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}</div></div>${action}</div>`;
+        `<div class="sc-sub">${sub}</div></div>${action}</div>`;
     };
     list.innerHTML=
       `<div class="swap-sec">🔴 Open requests</div>`+(open.length?open.map(card).join(''):`<div class="where-empty" style="padding:12px">No open requests 🎉</div>`)+
-      (covered.length?`<div class="swap-sec">✅ Covered</div>`+covered.map(card).join(''):'')+
+      (proposed.length?`<div class="swap-sec">⏳ Awaiting approval</div>`+proposed.map(card).join(''):'')+
+      (covered.length?`<div class="swap-sec">✅ Swapped</div>`+covered.map(card).join(''):'')+
       (past.length?`<div class="swap-sec">🕓 Recent</div>`+past.map(card).join(''):'');
-    list.querySelectorAll('[data-claim]').forEach(b=>b.addEventListener('click',()=>claimSwap(b.dataset.claim)));
+    list.querySelectorAll('[data-swap]').forEach(b=>b.addEventListener('click',()=>{
+      const id=b.dataset.swap;
+      const box=document.createElement('div'); box.style.cssText='flex:none;display:flex;gap:5px;align-items:center';
+      box.innerHTML=`<input type="date" class="finput sc-date" min="${today}" style="width:auto;padding:6px 8px;font-size:12px">`+
+        `<button class="sc-act" type="button">Offer</button>`;
+      b.replaceWith(box);
+      const inp=box.querySelector('.sc-date');
+      box.querySelector('.sc-act').addEventListener('click',()=>{ if(!inp.value){ inp.focus(); return; } proposeSwap(id, inp.value); });
+      inp.focus();
+    }));
+    list.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approveSwap(b.dataset.approve)));
+    list.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>declineSwap(b.dataset.decline)));
     list.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelSwap(b.dataset.cancel)));
   },err=>{const l=swapModal.querySelector('#swList');if(l)l.innerHTML=`<div class="where-empty">Couldn’t load swaps.<br>${esc(err.message||'')}</div>`;});
 }
@@ -1848,6 +2084,160 @@ function closeSwaps(){ if(swapsRef){swapsRef.off();swapsRef=null;} swapOverlay.c
 document.getElementById('swapBtn').addEventListener('click',openSwaps);
 swapOverlay.addEventListener('click',e=>{if(e.target===swapOverlay)closeSwaps();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
+
+// ---- Admin-configurable header (live from DB /config/header) ----
+(function loadHeaderConfig(){
+  if(!fbOK) return;
+  DB.on('config/header', cfg=>{
+    if(!cfg) return;
+    if(cfg.org!=null){ const e=document.querySelector('.eyebrow'); if(e) e.textContent=cfg.org; }
+    if(cfg.title!=null){ const h=document.querySelector('h1'); if(h) h.textContent=cfg.title; if(cfg.title){ document.title=cfg.title+' Calendar'; const bs=document.querySelector('.masthead .brand span'); if(bs) bs.textContent=cfg.title; } }
+    if(cfg.subtitle!=null){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
+    if(cfg.schoolUrl){ SCHOOL_URL=cfg.schoolUrl; }
+    if(cfg.whatsapp!=null){ GROUP_WHATSAPP=cfg.whatsapp; }
+  }, ()=>{});
+})();
+
+// ---- Rebuild the whole calendar from data (used when the bell schedule changes) ----
+function rebuildCalendar(){
+  const cal=document.getElementById('cal'); if(cal) cal.innerHTML='';
+  build();
+  if(typeof renderBdayBadges==='function') renderBdayBadges();
+  document.querySelectorAll('.month').forEach((m,i)=>{ m.style.animationDelay=Math.min(i*0.06,0.6)+'s'; });
+  if(typeof buildBanner==='function') buildBanner();
+  if(typeof runAlerts==='function') runAlerts();
+  if(typeof renderCountdown==='function') renderCountdown();
+  if(typeof checkBirthdayToday==='function') checkBirthdayToday();
+  if(typeof applyFilter==='function') applyFilter();
+  if(typeof applyEventDots==='function') applyEventDots();
+}
+
+// ---- Bell schedule from DB (admin upload) drives holidays / minimum days / year ----
+(function loadScheduleConfig(){
+  if(!fbOK) return;
+  DB.on('config/schedule', cfg=>{
+    if(!cfg) return; let changed=false;
+    if(cfg.first){ FIRST=cfg.first; changed=true; }
+    if(cfg.last){ LAST=cfg.last; changed=true; }
+    if(cfg.holidays && typeof cfg.holidays==='object'){ NO_SCHOOL=cfg.holidays; changed=true; }
+    if(Array.isArray(cfg.minimumDays)){ EARLY=new Set(cfg.minimumDays); changed=true; }
+    if(cfg.subtitle){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
+    if(changed) rebuildCalendar();
+  }, ()=>{});
+})();
+
+// ---- Swap request notifications (badge on 🔁 Swaps + toast) ----
+let swapSeen=new Set(); try{swapSeen=new Set(JSON.parse(localStorage.getItem('carpool-swap-seen')||'[]'));}catch(e){}
+let swapKnownIds=null;   // null until first snapshot (so we don't toast the backlog)
+function setSwapBadge(n){
+  const b=document.getElementById('swapBtn'); if(!b) return;
+  let dot=b.querySelector('.btn-badge');
+  if(n>0){ if(!dot){dot=document.createElement('span');dot.className='btn-badge';b.appendChild(dot);} dot.textContent=n>9?'9+':String(n); }
+  else if(dot){ dot.remove(); }
+}
+function showSwapToast(s){
+  const t=document.createElement('div'); t.className='swap-toast';
+  t.innerHTML=`<span style="font-size:18px">🔁</span><div><b>${esc(s.byName)}</b> needs a swap<br><span style="color:var(--sub)">${fmtDay(s.date)}${s.note?' · '+esc(s.note):''} — tap to swap a date</span></div>`;
+  t.addEventListener('click',()=>{ t.remove(); openSwaps(); });
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),400); }, 9000);
+}
+const swapReqOverlay=document.getElementById('swapReqOverlay');
+const swapReqModal=document.getElementById('swapReqModal');
+function closeSwapReq(){ swapReqOverlay.classList.remove('open'); }
+function showSwapRequestPopup(s){
+  if(swapReqOverlay.classList.contains('open') || swapOverlay.classList.contains('open')) return; // don't stack
+  const today=localDateStr(Date.now());
+  swapReqModal.innerHTML=
+    `<button class="mclose" id="srClose" aria-label="Close">×</button>`+
+    `<h2>🔁 Swap request</h2>`+
+    `<div class="msub"><b>${esc(s.byName)}</b> can’t drive <b>${fmtDay(s.date)}</b>${s.note?` — “${esc(s.note)}”`:''}${s.requestUser?` · asked ${esc(s.requestUser)}`:''}. Offer one of your days — they’ll approve it.</div>`+
+    `<div class="swap-form">`+
+      `<label style="font-size:11px;font-weight:700;color:var(--sub)">Your date to give in return</label>`+
+      `<input type="date" class="finput" id="srDate" min="${today}">`+
+      `<button class="mbtn live" id="srSwap">🔁 Offer this date</button>`+
+      `<button class="mbtn" id="srLater">Later</button>`+
+      `<div class="msg" id="srMsg"></div>`+
+    `</div>`;
+  swapReqOverlay.classList.add('open');
+  swapReqModal.querySelector('#srClose').addEventListener('click',closeSwapReq);
+  swapReqModal.querySelector('#srLater').addEventListener('click',closeSwapReq);
+  swapReqModal.querySelector('#srSwap').addEventListener('click',()=>{
+    const dv=swapReqModal.querySelector('#srDate').value;
+    if(!dv){ swapReqModal.querySelector('#srMsg').textContent='Pick your date first.'; swapReqModal.querySelector('#srDate').focus(); return; }
+    proposeSwap(s.id, dv); swapSeen.add(s.id); saveSwapSeen(); setSwapBadge(0); closeSwapReq();
+  });
+}
+// popup shown to the REQUESTER when someone offers a return date — needs their approval
+function showSwapApprovePopup(s){
+  if(swapReqOverlay.classList.contains('open') || swapOverlay.classList.contains('open')) return;
+  swapReqModal.innerHTML=
+    `<button class="mclose" id="saClose" aria-label="Close">×</button>`+
+    `<h2>🔁 Approve swap?</h2>`+
+    `<div class="msub"><b>${esc(s.coverName)}</b> offers to swap with you:<br>They drive <b>${fmtDay(s.date)}</b> · you drive <b>${fmtDay(s.coverDate)}</b>.</div>`+
+    `<div class="swap-form">`+
+      `<button class="mbtn live" id="saApprove">✓ Approve — update calendar</button>`+
+      `<button class="mbtn" id="saDecline">Decline</button>`+
+    `</div>`;
+  swapReqOverlay.classList.add('open');
+  swapReqModal.querySelector('#saClose').addEventListener('click',closeSwapReq);
+  swapReqModal.querySelector('#saApprove').addEventListener('click',()=>{ approveSwap(s.id); closeSwapReq(); });
+  swapReqModal.querySelector('#saDecline').addEventListener('click',()=>{ declineSwap(s.id); closeSwapReq(); });
+}
+swapReqOverlay.addEventListener('click',e=>{ if(e.target===swapReqOverlay) closeSwapReq(); });
+function saveSwapSeen(){ try{localStorage.setItem('carpool-swap-seen',JSON.stringify([...swapSeen].slice(-200)));}catch(e){} }
+function handleSwapNotifs(openOthers, proposalsForMe){
+  proposalsForMe=proposalsForMe||[];
+  const boardOpen=swapOverlay.classList.contains('open'), popupOpen=swapReqOverlay.classList.contains('open');
+  if(swapKnownIds!==null && !boardOpen && !popupOpen){
+    const freshProp=proposalsForMe.filter(s=>!swapSeen.has('P'+s.id));
+    const freshOpen=openOthers.filter(s=>!swapKnownIds.has(s.id) && !swapSeen.has(s.id));
+    if(freshProp.length){ showSwapApprovePopup(freshProp[0]); swapSeen.add('P'+freshProp[0].id); saveSwapSeen(); }
+    else if(freshOpen.length){ showSwapRequestPopup(freshOpen[0]); freshOpen.slice(1).forEach(showSwapToast); }
+  }
+  swapKnownIds=new Set(openOthers.map(s=>s.id));
+  const unseen=openOthers.filter(s=>!swapSeen.has(s.id)).length + proposalsForMe.length;
+  setSwapBadge(boardOpen?0:unseen);
+}
+function markSwapsSeen(){
+  if(swapKnownIds){ swapKnownIds.forEach(id=>swapSeen.add(id)); }
+  try{localStorage.setItem('carpool-swap-seen',JSON.stringify([...swapSeen].slice(-200)));}catch(e){}
+  setSwapBadge(0);
+}
+
+// ---- Covered swaps repaint the calendar (signed-in family only) ----
+(function loadSwapOverrides(){
+  if(!fbOK) return; let swapOverrideRef=null;
+  fbAuth.onAuthStateChanged(u=>{
+    if(u){
+      if(!swapOverrideRef){
+        swapOverrideRef=dref('swaps');
+        swapOverrideRef.on('value',snap=>{
+          const data=snap.val()||{}, next={}, today=localDateStr(Date.now()), openOthers=[], proposalsForMe=[];
+          const myUid=currentUser&&currentUser.uid;
+          Object.entries(data).forEach(([id,v])=>{
+            if(!v) return;
+            if(v.status==='covered' && v.date && v.coverName){
+              next[v.date]={name:v.coverName, from:v.byName||'', slot:v.slot||'Both'};
+              if(v.coverDate && v.byName) next[v.coverDate]={name:v.byName, from:v.coverName, slot:'Both'};
+            }
+            if((v.status||'open')==='open' && v.date>=today && v.by!==myUid){
+              openOthers.push({id, byName:v.byName||'A driver', date:v.date, note:v.note||'', requestUser:v.requestUser||''});
+            }
+            if(v.status==='proposed' && v.by===myUid && v.coverName && v.date>=today){
+              proposalsForMe.push({id, coverName:v.coverName, date:v.date, coverDate:v.coverDate});
+            }
+          });
+          if(JSON.stringify(next)!==JSON.stringify(SWAP_OVERRIDES)){ SWAP_OVERRIDES=next; rebuildCalendar(); }
+          handleSwapNotifs(openOthers, proposalsForMe);
+        },()=>{});
+      }
+    }else{
+      if(swapOverrideRef){ swapOverrideRef.off(); swapOverrideRef=null; }
+      if(Object.keys(SWAP_OVERRIDES).length){ SWAP_OVERRIDES={}; rebuildCalendar(); }
+    }
+  });
+})();
 
 // ---- PWA: install to home screen ----
 if('serviceWorker' in navigator){
@@ -1890,7 +2280,7 @@ function watchUnread(){
   fbAuth.onAuthStateChanged(u=>{
     if(u){
       if(!unreadRef){
-        unreadRef=fbDb.ref('messages').limitToLast(50);
+        unreadRef=dref('messages').limitToLast(50);
         unreadRef.on('value',snap=>{
           let latest=0, unread=0;
           snap.forEach(ch=>{const v=ch.val(); if(!v||!v.ts) return; latest=Math.max(latest,v.ts);
@@ -1933,7 +2323,7 @@ function openChat(){
 }
 function timeShort(ts){ if(!ts)return''; return new Date(ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
 function listenMsgs(){
-  msgsRef=fbDb.ref('messages').limitToLast(200);
+  msgsRef=dref('messages').limitToLast(200);
   msgsRef.on('value',snap=>{
     const list=chatModal.querySelector('#chatList'); if(!list) return;
     const rows=[]; snap.forEach(ch=>{const v=ch.val(); if(v&&v.text) rows.push(v);});
@@ -1953,7 +2343,7 @@ function sendMsg(){
   const inp=chatModal.querySelector('#chatInput'); if(!inp) return;
   const text=inp.value.trim(); if(!text) return;
   inp.value='';
-  fbDb.ref('messages').push({text,by:currentUser.uid,byName:chatMyName(),ts:Date.now()})
+  dref('messages').push({text,by:currentUser.uid,byName:chatMyName(),ts:Date.now()})
     .catch(err=>alert('Could not send: '+(err.message||'')));
 }
 function closeChat(){ chatOpen=false; if(msgsRef){msgsRef.off();msgsRef=null;} chatOverlay.classList.remove('open'); }
@@ -1981,7 +2371,7 @@ function openStats(){
   // trip stats from recorded tracks (signed-in only)
   if(fbOK&&currentUser){
     const ts=statsModal.querySelector('#tripStats'); ts.textContent='Loading recorded trips…';
-    fbDb.ref('tracks').once('value').then(snap=>{
+    dref('tracks').once('value').then(snap=>{
       const data=snap.val()||{}; const perName={}; let trips=0, ms=0;
       Object.values(data).forEach(sessions=>Object.values(sessions||{}).forEach(sess=>{
         const m=sess&&sess.meta; if(!m||!m.start)return; trips++;
@@ -1997,39 +2387,93 @@ document.getElementById('statsBtn').addEventListener('click',openStats);
 statsOverlay.addEventListener('click',e=>{if(e.target===statsOverlay)closeStats();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
 
-// ---- Countdown chip (next break / next birthday) ----
-(function countdown(){
+// ---- Countdown chip (next break / next birthday) — re-runnable ----
+function renderCountdown(){
   const host=document.querySelector('header.top .stats-row'); if(!host) return;
-  // next multi-day break start
+  const existing=document.getElementById('countRow'); if(existing) existing.remove();
   const brDates=Object.keys(NO_SCHOOL).sort();
   let nextBreak=null;
   for(const d of brDates){ if(d>=TODAY){ nextBreak={date:d,label:NO_SCHOOL[d]}; break; } }
-  // next birthday
   let nextBd=null;
   for(const nm in BIRTHDAYS){ const info=nextBirthdayInfo(BIRTHDAYS[nm]); if(info&&(!nextBd||info.days<nextBd.days)) nextBd={name:nm,...info}; }
   const chips=[];
   if(nextBreak){ const dd=daysAway(nextBreak.date);
     if(dd>=0&&dd<=60) chips.push(`<span class="countchip"><span class="cc-em">🏖️</span> <b>${dd}</b> day${dd===1?'':'s'} to ${esc(nextBreak.label)}</span>`); }
   if(nextBd&&nextBd.days<=90) chips.push(`<span class="countchip"><span class="cc-em">🎂</span> <b>${nextBd.days}</b> day${nextBd.days===1?'':'s'} to ${esc(nextBd.name)}’s birthday</span>`);
-  if(chips.length){ const wrap=document.createElement('div'); wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%';
+  if(chips.length){ const wrap=document.createElement('div'); wrap.id='countRow'; wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%';
     wrap.innerHTML=chips.join(''); host.parentNode.insertBefore(wrap,host.nextSibling); }
-})();
+}
+renderCountdown();
+// apply a DOB coming from the database and refresh everything that depends on it
+function updateKidBirthday(name,dob){
+  if(!BIRTHDAYS[name]) return;
+  BIRTHDAYS[name]={month:dob&&dob.month||0, day:dob&&dob.day||0, year:(dob&&dob.year)||null, photo:BIRTHDAYS[name].photo||''};
+  renderKidBirthday(name); renderBdayBadges(); renderCountdown();
+  if(typeof runAlerts==='function') runAlerts();
+  checkBirthdayToday();
+}
+
+// ---- Birthday greeting + confetti (shows on the actual birthday) ----
+function checkBirthdayToday(){
+  if(document.querySelector('.bday-greeting')) return;          // already showing
+  let seen=null; try{seen=localStorage.getItem('carpool-bday-seen');}catch(e){}
+  const [y,m,d]=TODAY.split('-').map(Number);
+  const who=[];
+  for(const nm in BIRTHDAYS){ const b=BIRTHDAYS[nm]; if(b&&b.month===m&&b.day===d) who.push({name:nm,age:b.year?(y-b.year):null}); }
+  if(!who.length || seen===TODAY) return;
+  celebrateBirthday(who);
+}
+function celebrateBirthday(who){
+  const names=who.map(w=>w.name);
+  const banner=document.createElement('div'); banner.className='bday-greeting';
+  const subs=who.map(w=>w.age?`${esc(w.name)} turns ${w.age} today 🎈`:`Wishing ${esc(w.name)} a wonderful day 🎈`).join(' · ');
+  banner.innerHTML=`<div class="bg-title"><span class="bg-emoji">🎉</span> Happy Birthday, ${names.map(esc).join(' & ')}! <span class="bg-emoji">🎂</span></div>`+
+    `<div class="bg-sub">${subs}</div>`+
+    `<button class="bg-close" aria-label="Close">×</button>`;
+  banner.querySelector('.bg-close').addEventListener('click',()=>{ banner.remove();
+    try{localStorage.setItem('carpool-bday-seen',TODAY);}catch(e){} });
+  const header=document.querySelector('header.top');
+  if(header&&header.parentNode) header.parentNode.insertBefore(banner,header.nextSibling);
+  else document.querySelector('.wrap').prepend(banner);
+  launchConfetti();
+}
+function launchConfetti(){
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  let cv=document.getElementById('confettiCanvas');
+  if(!cv){ cv=document.createElement('canvas'); cv.id='confettiCanvas'; document.body.appendChild(cv); }
+  const ctx=cv.getContext('2d'); const dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.width=innerWidth*dpr; cv.height=innerHeight*dpr; cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px';
+  const colors=['#7C3AED','#DB2777','#EA580C','#22C55E','#4F46E5','#FBBF24','#22D3EE'];
+  const parts=[];
+  for(let i=0;i<150;i++) parts.push({x:Math.random()*cv.width, y:-Math.random()*cv.height*0.4,
+    w:(6+Math.random()*6)*dpr, h:(9+Math.random()*9)*dpr, vy:(2+Math.random()*4)*dpr, vx:(-2+Math.random()*4)*dpr,
+    rot:Math.random()*6.28, vr:(-.25+Math.random()*.5), c:colors[Math.floor(Math.random()*colors.length)]});
+  const t0=performance.now(), dur=4000;
+  function frame(now){ const t=now-t0; ctx.clearRect(0,0,cv.width,cv.height);
+    parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.035*dpr; p.rot+=p.vr;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.globalAlpha=Math.max(0,1-t/dur);
+      ctx.fillStyle=p.c; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
+    if(t<dur) requestAnimationFrame(frame); else if(cv.parentNode) cv.remove();
+  }
+  requestAnimationFrame(frame);
+}
+checkBirthdayToday();
 
 // ---- Visitor counter (public /stats) ----
 (function visitorCounter(){
   if(!fbOK) return;
   try{
     // total page views
-    fbDb.ref('stats/visits').transaction(v=>(v||0)+1).catch(()=>{});
+    dref('stats/visits').transaction(v=>(v||0)+1).catch(()=>{});
     // unique visitors (once per browser)
     let vid=null; try{vid=localStorage.getItem('carpool-vid');}catch(e){}
     if(!vid){
       vid='v'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
       try{localStorage.setItem('carpool-vid',vid);}catch(e){}
-      fbDb.ref('stats/unique').transaction(v=>(v||0)+1).catch(()=>{});
+      dref('stats/unique').transaction(v=>(v||0)+1).catch(()=>{});
     }
     // live display
-    fbDb.ref('stats').on('value',snap=>{
+    dref('stats').on('value',snap=>{
       const s=snap.val()||{};
       const v=(s.visits||0).toLocaleString(), u=(s.unique||0).toLocaleString();
       document.querySelectorAll('.jsVisits').forEach(el=>el.innerHTML=`👀 <b>${v}</b> visits · <b>${u}</b> visitors`);
@@ -2042,13 +2486,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
   if(!fbOK) return;
   try{
     const sid='p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-    const pRef=fbDb.ref('presence/'+sid);
+    const pRef=dref('presence/'+sid);
     const myPresenceName=()=>currentUser?((currentUser.displayName)||(currentUser.email||'').split('@')[0]||null):null;
     const beat=()=>pRef.set({t:Date.now(),name:myPresenceName()}).catch(()=>{});
     fbDb.ref('.info/connected').on('value',s=>{ if(s.val()===true){ pRef.onDisconnect().remove(); beat(); } });
     setInterval(beat,25000);
     window.__beatPresence=beat; // re-beat with name right after login
-    fbDb.ref('presence').on('value',snap=>{
+    dref('presence').on('value',snap=>{
       const d=snap.val()||{}, now=Date.now(); let n=0; const names=[];
       Object.values(d).forEach(v=>{ if(v&&v.t&&now-v.t<90000){ n++; if(v.name&&names.indexOf(v.name)<0) names.push(v.name); } });
       document.querySelectorAll('.jsOnline').forEach(el=>el.innerHTML=`🟢 <b>${n}</b> online now`);
@@ -2063,15 +2507,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStats();});
 function riderByName(name){return [...document.querySelectorAll('.rider')].find(r=>{const n=r.querySelector('.rname');return n&&n.textContent.trim()===name;});}
 function applyKidPhoto(name,uri){
   const r=riderByName(name); if(!r) return; const av=r.querySelector('.av'); if(!av) return;
-  if(!av.dataset.initial) av.dataset.initial=av.textContent;
-  if(uri){av.style.backgroundImage=`url('${uri}')`;av.classList.add('photo');av.textContent='';r.dataset.photo=uri;}
-  else{av.style.backgroundImage='';av.classList.remove('photo');av.textContent=av.dataset.initial;delete r.dataset.photo;}
+  if(uri){av.style.backgroundImage=`url('${uri}')`;av.classList.add('photo');r.dataset.photo=uri;}
+  else{av.style.backgroundImage='';av.classList.remove('photo');delete r.dataset.photo;}
 }
 function setKidEditMode(on){
   document.querySelectorAll('.rider').forEach(r=>{
     const nameEl=r.querySelector('.rname'); if(!nameEl) return;
     const name=nameEl.textContent.trim();
     let btn=r.querySelector('.kphoto-btn');
+    let dbtn=r.querySelector('.kdob-btn');
     if(on){
       if(!btn){
         btn=document.createElement('button');btn.className='kphoto-btn';btn.type='button';
@@ -2082,8 +2526,29 @@ function setKidEditMode(on){
         input.addEventListener('change',ev=>onKidPhotoPick(name,ev,btn));
         r.appendChild(btn);r.appendChild(input);
       }
-    }else if(btn){btn.remove();const inp=r.querySelector('.kphoto-input');if(inp)inp.remove();}
+      if(!dbtn){
+        dbtn=document.createElement('button');dbtn.className='kdob-btn';dbtn.type='button';
+        dbtn.title='Set birthday';dbtn.textContent='🎂';
+        const dinput=document.createElement('input');dinput.type='date';dinput.className='kdob-input';dinput.style.display='none';
+        const b=BIRTHDAYS[name]; if(b&&b.month&&b.day){ const y=b.year||2016;
+          dinput.value=`${y}-${String(b.month).padStart(2,'0')}-${String(b.day).padStart(2,'0')}`; }
+        dbtn.addEventListener('click',()=>{ try{ dinput.showPicker?dinput.showPicker():dinput.click(); }catch(e){ dinput.click(); } });
+        dinput.addEventListener('change',ev=>onKidDobPick(name,ev,dbtn));
+        r.appendChild(dbtn);r.appendChild(dinput);
+      }
+    }else{
+      if(btn){btn.remove();const inp=r.querySelector('.kphoto-input');if(inp)inp.remove();}
+      if(dbtn){dbtn.remove();const di=r.querySelector('.kdob-input');if(di)di.remove();}
+    }
   });
+}
+function onKidDobPick(name,ev,btn){
+  const val=ev.target.value; if(!val) return;           // YYYY-MM-DD
+  const [y,m,d]=val.split('-').map(Number); if(!m||!d) return;
+  if(btn) btn.textContent='…';
+  dref('kids/'+name).update({dob:{month:m,day:d,year:y||null},dobBy:currentUser?currentUser.uid:null,dobTs:Date.now()})
+    .then(()=>{if(btn)btn.textContent='🎂';})
+    .catch(err=>{if(btn)btn.textContent='🎂';alert('Could not save birthday: '+(err.message||''));});
 }
 function onKidPhotoPick(name,ev,btn){
   const file=ev.target.files&&ev.target.files[0]; if(!file) return;
@@ -2095,7 +2560,7 @@ function onKidPhotoPick(name,ev,btn){
     const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;
     cv.getContext('2d').drawImage(img,0,0,cw,ch);
     const uri=cv.toDataURL('image/jpeg',0.82);
-    fbDb.ref('kids/'+name).set({photo:uri,by:currentUser?currentUser.uid:null,ts:Date.now()})
+    dref('kids/'+name).update({photo:uri,photoBy:currentUser?currentUser.uid:null,photoTs:Date.now()})
       .then(()=>{if(btn)btn.textContent='📷';})
       .catch(err=>{if(btn)btn.textContent='📷';alert('Could not save photo: '+(err.message||''));});
   };img.onerror=()=>{if(btn)btn.textContent='📷';alert('That image could not be read.');};img.src=rd.result;};
@@ -2107,10 +2572,16 @@ if(fbOK){
     if(u){
       setKidEditMode(true);
       if(!kidsRef){
-        kidsRef=fbDb.ref('kids');
-        kidsRef.on('value',snap=>{const data=snap.val()||{};
+        kidsRef=dref('kids');
+        kidsRef.on('value',snap=>{const data=snap.val()||{}; let dobChanged=false;
           document.querySelectorAll('.rider').forEach(r=>{const n=r.querySelector('.rname');if(!n)return;
-            const nm=n.textContent.trim();applyKidPhoto(nm,(data[nm]&&data[nm].photo)||null);});
+            const nm=n.textContent.trim();
+            applyKidPhoto(nm,(data[nm]&&data[nm].photo)||null);
+            const dob=data[nm]&&data[nm].dob;
+            if(dob&&BIRTHDAYS[nm]){ BIRTHDAYS[nm]={month:dob.month||0,day:dob.day||0,year:dob.year||null,photo:''};
+              renderKidBirthday(nm); dobChanged=true; }
+          });
+          if(dobChanged){ renderBdayBadges(); renderCountdown(); if(typeof runAlerts==='function') runAlerts(); }
           // feed the falling-flowers with the private photos (only while signed in)
           kidPhotos=Object.values(data).map(v=>v&&v.photo).filter(Boolean);
           refreshPetals();
