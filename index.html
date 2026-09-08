@@ -1472,7 +1472,7 @@ function liveTrackScreen(){
   if(myTrack.length>1) liveModal.querySelector('#exportBtn').style.display='';
   // auto-record toggle
   const autoChk=liveModal.querySelector('#autoChk');
-  let autoPref=true; try{autoPref=localStorage.getItem('carpool-auto')!=='off';}catch(e){}
+  let autoPref=false; try{autoPref=localStorage.getItem('carpool-auto')==='on';}catch(e){}  // OFF by default
   autoChk.checked=autoPref;
   autoChk.addEventListener('change',()=>{
     try{localStorage.setItem('carpool-auto',autoChk.checked?'on':'off');}catch(e){}
@@ -2043,22 +2043,40 @@ function openSwaps(preDate){
       `<div class="row"><select class="fselect" id="swSlot">`+
         `<option value="Both">Both ways</option><option value="Morning">Morning only</option><option value="Afternoon">Afternoon only</option></select>`+
         `<select class="fselect" id="swReq"><option value="">Ask anyone</option>`+NAMES.map(n=>`<option value="${n}">Ask ${n}</option>`).join('')+`</select></div>`+
+      `<select class="fselect" id="swWant" style="display:none"></select>`+
       `<input class="finput" id="swNote" type="text" placeholder="Note (optional) — e.g. early meeting" maxlength="80">`+
       `<button class="mbtn live" id="swPost">Post swap request</button>`+
     `</div>`+
     `<div id="swList"><div class="where-empty">Loading…</div></div>`);
   swapModal.querySelector('#swPost').addEventListener('click',postSwap);
+  // when a specific driver is asked, let the requester pick one of THAT driver's dates to take
+  const swReqEl=swapModal.querySelector('#swReq'), swWantEl=swapModal.querySelector('#swWant');
+  swReqEl.addEventListener('change',()=>{
+    const name=swReqEl.value;
+    if(!name){ swWantEl.style.display='none'; swWantEl.innerHTML=''; return; }
+    const dates=driverUpcomingDates(name);
+    swWantEl.innerHTML=`<option value="">${esc(name)}’s date to take — optional</option>`+
+      dates.map(d=>`<option value="${d}">Take ${esc(name)}’s ${fmtDay(d)}</option>`).join('');
+    swWantEl.style.display=dates.length?'':'none';
+  });
   listenSwaps();
   markSwapsSeen();
+}
+function driverUpcomingDates(name){
+  const today=localDateStr(Date.now());
+  return [...document.querySelectorAll('.cell.school[data-date]')]
+    .filter(c=>c.dataset.person===name && c.dataset.date>=today)
+    .map(c=>c.dataset.date).slice(0,20);
 }
 function postSwap(){
   const date=swapModal.querySelector('#swDate').value;
   const slot=swapModal.querySelector('#swSlot').value;
   const note=swapModal.querySelector('#swNote').value.trim();
   const reqUser=(swapModal.querySelector('#swReq')||{}).value||'';
+  const wantDate=(swapModal.querySelector('#swWant')||{}).value||'';
   if(!date){return;}
   const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
-  dref('swaps').push({date,slot,note,requestUser:reqUser||null,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
+  dref('swaps').push({date,slot,note,requestUser:reqUser||null,wantDate:(reqUser&&wantDate)?wantDate:null,by:currentUser.uid,byName:nm,status:'open',ts:Date.now()})
     .then(()=>{swapModal.querySelector('#swNote').value='';})
     .catch(err=>alert('Could not post: '+(err.message||'')));
 }
@@ -2072,6 +2090,12 @@ function proposeSwap(id,coverDate){
 function approveSwap(id){ dref('swaps/'+id).update({status:'covered',approvedTs:Date.now()}).catch(err=>alert('Could not approve: '+(err.message||''))); }
 function declineSwap(id){ dref('swaps/'+id).update({status:'open',coverBy:null,coverName:null,coverDate:null,coverTs:null}).catch(()=>{}); }
 function cancelSwap(id){ dref('swaps/'+id).remove().catch(()=>{}); }
+// asked driver accepts a fully-specified swap (requester already proposed both dates) -> covered
+function acceptDirectSwap(r){
+  const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
+  dref('swaps/'+r.id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverDate:r.wantDate||null,coverTs:Date.now(),approvedTs:Date.now()})
+    .catch(err=>alert('Could not accept: '+(err.message||'')));
+}
 function listenSwaps(){
   swapsRef=dref('swaps');
   swapsRef.on('value',snap=>{
@@ -2091,9 +2115,13 @@ function listenSwaps(){
       const cls=s==='covered'?'covered':(s==='proposed'?'proposed':(r.date<today?'past':'open'));
       let action='', sub='';
       if(s==='open'){
-        action = mine ? `<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`
-                      : `<button class="sc-act" data-swap="${r.id}">🔁 Swap a date</button>`;
-        sub = `${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}${r.requestUser?` · asked ${esc(r.requestUser)}`:''}`;
+        const directToMe = !mine && r.wantDate && r.requestUser && r.requestUser===(currentUser&&currentUser.displayName);
+        if(mine) action=`<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`;
+        else if(directToMe) action=`<button class="sc-act" data-accept="${r.id}">✓ Accept swap</button>`;
+        else action=`<button class="sc-act" data-swap="${r.id}">🔁 Swap a date</button>`;
+        sub = directToMe
+          ? `You take ${shortD(r.date)} · ${esc(r.byName)} takes your ${shortD(r.wantDate)}`
+          : `${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}${r.requestUser?` · asked ${esc(r.requestUser)}${r.wantDate?' for '+shortD(r.wantDate):''}`:''}`;
       } else if(s==='proposed'){
         if(mine) action = `<span style="display:flex;gap:5px"><button class="sc-act" data-approve="${r.id}">✓ Approve</button><button class="sc-act cancel" data-decline="${r.id}">✕</button></span>`;
         else action = `<span class="sc-tag" style="color:#C2620A">⏳ ${iOffered?'You offered':'Awaiting '+esc(r.byName||'')}</span>`;
@@ -2123,6 +2151,7 @@ function listenSwaps(){
     }));
     list.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approveSwap(b.dataset.approve)));
     list.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>declineSwap(b.dataset.decline)));
+    list.querySelectorAll('[data-accept]').forEach(b=>b.addEventListener('click',()=>{const r=rows.find(x=>x.id===b.dataset.accept); if(r) acceptDirectSwap(r);}));
     list.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelSwap(b.dataset.cancel)));
   },err=>{const l=swapModal.querySelector('#swList');if(l)l.innerHTML=`<div class="where-empty">Couldn’t load swaps.<br>${esc(err.message||'')}</div>`;});
 }
@@ -2195,6 +2224,23 @@ function closeSwapReq(){ swapReqOverlay.classList.remove('open'); }
 function showSwapRequestPopup(s){
   if(swapReqOverlay.classList.contains('open') || swapOverlay.classList.contains('open')) return; // don't stack
   const today=localDateStr(Date.now());
+  const directToMe = s.wantDate && s.requestUser && s.requestUser===(currentUser&&currentUser.displayName);
+  if(directToMe){
+    // requester already proposed both dates and asked ME specifically → just Accept/Decline
+    swapReqModal.innerHTML=
+      `<button class="mclose" id="srClose" aria-label="Close">×</button>`+
+      `<h2>🔁 Swap request for you</h2>`+
+      `<div class="msub"><b>${esc(s.byName)}</b> asks to swap${s.note?` — “${esc(s.note)}”`:''}:<br>You drive <b>${fmtDay(s.date)}</b> · ${esc(s.byName)} takes your <b>${fmtDay(s.wantDate)}</b>.</div>`+
+      `<div class="swap-form">`+
+        `<button class="mbtn live" id="srAccept">✓ Accept swap</button>`+
+        `<button class="mbtn" id="srLater">Later</button>`+
+      `</div>`;
+    swapReqOverlay.classList.add('open');
+    swapReqModal.querySelector('#srClose').addEventListener('click',closeSwapReq);
+    swapReqModal.querySelector('#srLater').addEventListener('click',closeSwapReq);
+    swapReqModal.querySelector('#srAccept').addEventListener('click',()=>{ acceptDirectSwap(s); swapSeen.add(s.id); saveSwapSeen(); setSwapBadge(0); closeSwapReq(); });
+    return;
+  }
   swapReqModal.innerHTML=
     `<button class="mclose" id="srClose" aria-label="Close">×</button>`+
     `<h2>🔁 Swap request</h2>`+
@@ -2295,7 +2341,7 @@ function markSwapsSeen(){
               if(v.coverDate && v.byName) next[v.coverDate]={name:v.byName, from:v.coverName, slot:'Both'};
             }
             if((v.status||'open')==='open' && v.date>=today && v.by!==myUid){
-              openOthers.push({id, byName:v.byName||'A driver', date:v.date, note:v.note||'', requestUser:v.requestUser||''});
+              openOthers.push({id, byName:v.byName||'A driver', date:v.date, note:v.note||'', requestUser:v.requestUser||'', wantDate:v.wantDate||''});
             }
             if(v.status==='proposed' && v.by===myUid && v.coverName && v.date>=today){
               proposalsForMe.push({id, coverName:v.coverName, date:v.date, coverDate:v.coverDate});
