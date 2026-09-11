@@ -1,0 +1,54 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "config": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "stats": {
+      ".read": true,
+      ".write": true,
+      "$k": { ".validate": "newData.isNumber() || newData.hasChildren() || newData.isString()" }
+    },
+    "presence": {
+      ".read": true,
+      ".write": true
+    },
+
+    "locations": {
+      ".read": "auth != null",
+      "$uid": { ".write": "auth != null && auth.uid === $uid" }
+    },
+    "tracks": {
+      ".read": "auth != null",
+      "$uid": { ".write": "auth != null && auth.uid === $uid" }
+    },
+    "kids":     { ".read": "auth != null", ".write": "auth != null" },
+    "swaps":    { ".read": "auth != null", ".write": "auth != null" },
+    "messages": { ".read": "auth != null", ".write": "auth != null" },
+
+    "stg": {
+      "config":   { ".read": true, ".write": "auth != null" },
+      "stats":    { ".read": true, ".write": true },
+      "presence": { ".read": true, ".write": true },
+      "locations": {
+        ".read": "auth != null",
+        "$uid": { ".write": "auth != null && auth.uid === $uid" }
+      },
+      "tracks": {
+        ".read": "auth != null",
+        "$uid": { ".write": "auth != null && auth.uid === $uid" }
+      },
+      "kids":     { ".read": "auth != null", ".write": "auth != null" },
+      "swaps":    { ".read": "auth != null", ".write": "auth != null" },
+      "messages": { ".read": "auth != null", ".write": "auth != null" }
+    },
+
+    "demo": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
