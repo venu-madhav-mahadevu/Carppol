@@ -105,10 +105,21 @@ function render(){
     '<div id="schedPreview" class="desc" style="margin-top:10px"></div>'+
     '<button class="btn" id="saveSched" disabled>Save schedule</button>'+
     '<div class="msg" id="smsg"></div></div>'+
+    '<div class="card"><h2>⏰ Carpool &amp; camera times</h2>'+
+    '<div class="desc">When the live camera appears for families (and when auto-record runs). Applies to both the live site and staging.</div>'+
+    '<label>Morning window</label>'+
+    '<div style="display:flex;gap:8px;align-items:center"><input id="tmS" type="time" style="flex:1"> <span>to</span> <input id="tmE" type="time" style="flex:1"></div>'+
+    '<label>Afternoon window</label>'+
+    '<div style="display:flex;gap:8px;align-items:center"><input id="taS" type="time" style="flex:1"> <span>to</span> <input id="taE" type="time" style="flex:1"></div>'+
+    '<label>Afternoon on minimum days</label>'+
+    '<div style="display:flex;gap:8px;align-items:center"><input id="tmdS" type="time" style="flex:1"> <span>to</span> <input id="tmdE" type="time" style="flex:1"></div>'+
+    '<button class="btn" id="saveTimes">Save times</button>'+
+    '<div class="msg" id="tmsg"></div></div>'+
     '<div class="card"><h2>More settings</h2>'+
     '<div class="soon">Contacts, kids, drivers and rotation editors are coming next.</div></div>';
   document.getElementById('outBtn').onclick=()=>auth.signOut();
   document.getElementById('saveHeader').onclick=saveHeader;
+  document.getElementById('saveTimes').onclick=saveTimes;
   document.getElementById('dlTemplate').onclick=downloadTemplate;
   document.getElementById('schedFile').onchange=onSchedFile;
   document.getElementById('saveSched').onclick=saveSchedule;
@@ -120,6 +131,24 @@ function render(){
   }).catch(()=>{});
   // camera link is private → read from the auth-gated /secure/cameraUrl node
   dref('secure/cameraUrl').once('value').then(s=>{ if(document.getElementById('fCam')) document.getElementById('fCam').value=s.val()||''; }).catch(()=>{});
+  // carpool/camera window times (public config, with sensible defaults)
+  dref('config/windows').once('value').then(s=>{ const w=s.val()||{};
+    const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value=val||''; };
+    const m=w.morning||{}, a=w.afternoon||{}, d=w.minDayAfternoon||{};
+    set('tmS', m.start||'07:20'); set('tmE', m.end||'08:30');
+    set('taS', a.start||'13:40'); set('taE', a.end||'15:00');
+    set('tmdS', d.start||'12:00'); set('tmdE', d.end||'13:00');
+  }).catch(()=>{});
+}
+function saveTimes(){
+  const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const win={ morning:{start:g('tmS'),end:g('tmE')}, afternoon:{start:g('taS'),end:g('taE')}, minDayAfternoon:{start:g('tmdS'),end:g('tmdE')} };
+  const m=document.getElementById('tmsg'); m.className='msg';
+  for(const [k,v] of Object.entries(win)){ if(!/^\d\d:\d\d$/.test(v.start)||!/^\d\d:\d\d$/.test(v.end)){ m.className='msg err'; m.textContent='Please fill all start and end times (HH:MM).'; return; } if(v.start>=v.end){ m.className='msg err'; m.textContent='Each window\u2019s start must be before its end ('+k+').'; return; } }
+  m.textContent='Saving…';
+  dref('config/windows').set({...win,by:user.uid,ts:Date.now()})
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  (camera + carpool times updated live)'; })
+    .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
 }
 // ---- Bell schedule upload ----
 let parsedSchedule=null;

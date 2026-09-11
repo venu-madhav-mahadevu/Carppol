@@ -2216,6 +2216,20 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
   }, ()=>{});
 })();
 
+// ---- Admin-configurable carpool / camera window times (config/windows overrides defaults) ----
+(function loadWindowConfig(){
+  if(!fbOK) return;
+  DB.on('config/windows', w=>{
+    if(!w) return;
+    const ok=v=>v&&/^\d\d:\d\d$/.test(v.start)&&/^\d\d:\d\d$/.test(v.end)&&v.start<v.end;
+    if(ok(w.morning)){ RECORD_WINDOWS.morning.start=w.morning.start; RECORD_WINDOWS.morning.end=w.morning.end; }
+    if(ok(w.afternoon)){ RECORD_WINDOWS.afternoon.start=w.afternoon.start; RECORD_WINDOWS.afternoon.end=w.afternoon.end; }
+    if(ok(w.minDayAfternoon)){ RECORD_WINDOWS.minDayAfternoon.start=w.minDayAfternoon.start; RECORD_WINDOWS.minDayAfternoon.end=w.minDayAfternoon.end; }
+    if(typeof updateCameraBanner==='function') updateCameraBanner();
+    if(typeof autoTick==='function') autoTick();   // refresh any open live-record schedule text
+  }, ()=>{});
+})();
+
 // ---- Camera link is PRIVATE: stored at auth-gated /secure/cameraUrl, read only when signed in ----
 (function loadCameraConfig(){
   if(!fbOK) return;
