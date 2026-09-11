@@ -31,6 +31,7 @@ const CAMERA_NAME   = process.env.RING_CAMERA_NAME || '';
 const PORT          = parseInt(process.env.PORT || '8123', 10);
 const ALLOW_ORIGIN  = process.env.ALLOW_ORIGIN || 'https://venu-madhav-mahadevu.github.io';
 const IDLE_STOP_MS  = parseInt(process.env.IDLE_STOP_MS || '60000', 10);
+const STREAM_KEY    = process.env.STREAM_KEY || '';   // shared secret; requests without it get 403
 
 if (!REFRESH_TOKEN) {
   console.error('\n[bridge] Missing RING_REFRESH_TOKEN. Run "npm run get-token" first (see README).\n');
@@ -45,22 +46,40 @@ let liveCall = null;          // active Ring live session
 let lastPoll = 0;             // last time a viewer fetched the playlist
 let starting = null;          // in-flight start promise (dedupes concurrent starts)
 
+let FFMPEG_PATH;
+try { FFMPEG_PATH = require('ffmpeg-static'); } catch (_) { /* fall back to system ffmpeg */ }
+
+// Save a rotated refresh token back into .env (in place, keeping the rest of the file).
+// The token value is never printed to the console or logs.
+function persistToken(tok) {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    let txt = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+    if (/^RING_REFRESH_TOKEN=.*$/m.test(txt)) txt = txt.replace(/^RING_REFRESH_TOKEN=.*$/m, 'RING_REFRESH_TOKEN=' + tok);
+    else txt = 'RING_REFRESH_TOKEN=' + tok + '\n' + txt;
+    fs.writeFileSync(envPath, txt);
+    console.log('[bridge] saved rotated refresh token to .env');
+  } catch (e) { console.warn('[bridge] could not persist token:', e.message); }
+}
+
 async function getCamera() {
   if (camera) return camera;
   ringApi = new RingApi({
     refreshToken: REFRESH_TOKEN,
+    ffmpegPath: FFMPEG_PATH || undefined,   // use the bundled ffmpeg binary
     // do not auto-refresh subscriptions we don't use
     cameraStatusPollingSeconds: 600,
   });
+  if (FFMPEG_PATH) console.log('[bridge] ffmpeg:', FFMPEG_PATH);
   const cams = await ringApi.getCameras();
   if (!cams.length) throw new Error('No Ring cameras found on this account.');
   camera = CAMERA_NAME
     ? (cams.find(c => (c.name || '').toLowerCase().includes(CAMERA_NAME.toLowerCase())) || cams[0])
     : cams[0];
   console.log('[bridge] Using camera:', camera.name);
-  // keep the token fresh on disk-less restarts
+  // Ring rotates the refresh token on connect — persist it to .env so restarts keep working.
   ringApi.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
-    if (newRefreshToken) console.log('[bridge] (Ring rotated the refresh token — update your env with the new one on next restart.)');
+    if (newRefreshToken) persistToken(newRefreshToken);
   });
   return camera;
 }
@@ -100,8 +119,15 @@ setInterval(() => { if (liveCall && Date.now() - lastPoll > IDLE_STOP_MS) stopSt
 const app = express();
 app.use(cors({ origin: ALLOW_ORIGIN }));
 
-// health check
+// health check (open — reveals nothing sensitive)
 app.get('/healthz', (_req, res) => res.json({ ok: true, streaming: !!liveCall, camera: camera && camera.name }));
+
+// Require the shared secret on all /live/* requests. Without it → 403, so the public
+// tunnel URL alone is useless to anyone outside your families.
+app.use('/live', (req, res, next) => {
+  if (STREAM_KEY && req.query.k !== STREAM_KEY) return res.status(403).send('forbidden');
+  next();
+});
 
 // playlist: ensures the stream is running, then serves the m3u8 (waits briefly for first segment)
 app.get('/live/stream.m3u8', async (req, res) => {
@@ -112,9 +138,12 @@ app.get('/live/stream.m3u8', async (req, res) => {
     // wait up to ~8s for ffmpeg to write the first playlist
     for (let i = 0; i < 40 && !fs.existsSync(file); i++) await new Promise(r => setTimeout(r, 200));
     if (!fs.existsSync(file)) return res.status(503).send('stream warming up, retry');
+    // Rewrite segment names so each carries the key (relative URLs don't inherit ?k=).
+    let m3u8 = fs.readFileSync(file, 'utf8');
+    if (STREAM_KEY) m3u8 = m3u8.replace(/^([\w.-]+\.ts)\s*$/gm, `$1?k=${STREAM_KEY}`);
     res.setHeader('Cache-Control', 'no-cache');
     res.type('application/vnd.apple.mpegurl');
-    fs.createReadStream(file).pipe(res);
+    res.send(m3u8);
   } catch (e) {
     console.error('[bridge] start error:', e.message);
     res.status(500).send('bridge error');
