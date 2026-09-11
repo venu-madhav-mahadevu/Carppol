@@ -1,0 +1,17 @@
+{
+  "name": "carpool-ring-bridge",
+  "version": "1.0.0",
+  "description": "Tiny always-on bridge that turns a Ring account into an HLS stream the carpool calendar can embed. The Ring token stays here, never in the webpage.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "get-token": "npx -p ring-client-api ring-auth-cli"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "ring-client-api": "^13.1.0"
+  },
+  "engines": { "node": ">=18" }
+}

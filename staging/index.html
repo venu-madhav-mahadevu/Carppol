@@ -592,6 +592,16 @@
   .cam-banner .cb-go{font:inherit;font-weight:800;font-size:12.5px;color:#1D4ED8;background:#fff;
     border-radius:20px;padding:7px 15px;flex:none;}
   @keyframes campulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.7);}70%{box-shadow:0 0 0 7px rgba(239,68,68,0);}100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}}
+  .cam-modal{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;
+    padding:18px;background:rgba(10,14,25,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}
+  .cam-modal .cm-card{position:relative;width:min(760px,100%);background:#0b1020;border-radius:16px;padding:14px;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.7);}
+  .cam-modal .cm-head{color:#fff;font-size:15px;margin:2px 4px 10px;display:flex;gap:7px;align-items:center;}
+  .cam-modal .cm-title{font-weight:800;}
+  .cam-modal .cm-video{width:100%;aspect-ratio:16/9;background:#000;border-radius:11px;display:block;}
+  .cam-modal .cm-note{color:#9fb0d0;font-size:12px;margin:9px 4px 2px;}
+  .cam-modal .cm-x{position:absolute;top:9px;right:11px;z-index:2;width:32px;height:32px;border:none;cursor:pointer;
+    border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:19px;line-height:1;}
   .swap-toast{position:fixed;top:64px;right:14px;z-index:10001;max-width:290px;line-height:1.35;
     background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
     border:1px solid var(--glass-brd);border-radius:14px;padding:11px 14px;font-size:12.5px;cursor:pointer;
@@ -2204,14 +2214,47 @@ function updateCameraBanner(){
       if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
       else document.querySelector('.wrap').prepend(b); }
     b.href=url;
+    const live = isHlsUrl(url);   // .m3u8 from the Ring bridge → play inline; otherwise open the link
+    b.onclick = live ? (e=>{ e.preventDefault(); openCameraModal(url, win); }) : null;
     const label = win ? esc(win.label)+' carpool' : 'preview';
     const demoNote = (CAM_IS_STAGING && !CAMERA_URL) ? ' <small style="opacity:.8">(demo link — set yours in admin)</small>' : '';
     b.innerHTML='<span class="cb-ic">📹</span>'+
       '<div class="cb-txt"><b>Live camera — '+label+'</b>'+demoNote+
-      '<small>Tap to watch the pickup / drop-off at the house</small></div>'+
-      '<span class="cb-go">Watch ›</span>';
+      '<small>'+(live?'Tap to watch the live feed here':'Tap to watch the pickup / drop-off at the house')+'</small></div>'+
+      '<span class="cb-go">'+(live?'▶ Watch live':'Watch ›')+'</span>';
     b.hidden=false;
   } else if(b){ b.hidden=true; }
+}
+function isHlsUrl(u){ return /\.m3u8(\?|#|$)/i.test(u||''); }
+// Inline live player for a bridge HLS stream (Ring key stays on the bridge, never here).
+function openCameraModal(url, win){
+  let ov=document.getElementById('camModal');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='camModal'; ov.className='cam-modal';
+    ov.innerHTML='<div class="cm-card"><button class="cm-x" type="button" aria-label="Close">×</button>'+
+      '<div class="cm-head">📹 <b class="cm-title">Live camera</b></div>'+
+      '<video class="cm-video" playsinline autoplay muted controls></video>'+
+      '<div class="cm-note"></div></div>';
+    document.body.appendChild(ov);
+    const close=()=>{ const v=ov.querySelector('.cm-video'); try{ if(v._hls){v._hls.destroy(); v._hls=null;} v.pause(); v.removeAttribute('src'); v.load(); }catch(_){} ov.hidden=true; };
+    ov.querySelector('.cm-x').onclick=close;
+    ov.addEventListener('click',e=>{ if(e.target===ov) close(); });
+  }
+  ov.querySelector('.cm-title').textContent = 'Live camera'+(win?(' — '+win.label+' carpool'):'');
+  ov.querySelector('.cm-note').textContent = 'Streaming from your home camera bridge.';
+  ov.hidden=false;
+  const v=ov.querySelector('.cm-video');
+  playHls(v, url);
+}
+function playHls(video, url){
+  if(video.canPlayType('application/vnd.apple.mpegurl')){ video.src=url; video.play().catch(()=>{}); return; }
+  const attach=()=>{ try{ if(video._hls) video._hls.destroy(); const h=new window.Hls({liveDurationInfinity:true}); h.loadSource(url); h.attachMedia(video); h.on(window.Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{})); video._hls=h; }catch(e){ video.outerHTML='<div class="cm-note">Could not load the stream. Check the bridge is running.</div>'; } };
+  if(window.Hls){ attach(); return; }
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js';
+  s.onload=attach;
+  s.onerror=()=>{ const n=document.querySelector('#camModal .cm-note'); if(n) n.textContent='Could not load the video player.'; };
+  document.head.appendChild(s);
 }
 setInterval(updateCameraBanner, 30000);
 document.addEventListener('DOMContentLoaded', updateCameraBanner);
