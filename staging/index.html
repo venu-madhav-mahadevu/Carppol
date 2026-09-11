@@ -2225,8 +2225,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
 
 // ---- Live camera quick-launch ----
 // PRIVATE: only signed-in families ever see it (the link lives at auth-gated /secure/cameraUrl).
-// PROD: shows only during the morning/afternoon carpool windows, and only when a link is set.
-// STAGING: always visible once signed in (preview), with a demo link fallback to verify it.
+// TIMING: shows ONLY during the morning/afternoon carpool windows (every environment).
 const CAM_IS_STAGING = (DB_PREFIX==='stg/');
 const CAM_DEMO_URL   = 'https://account.ring.com';
 function updateCameraBanner(){
@@ -2234,7 +2233,7 @@ function updateCameraBanner(){
   const signedIn = !!currentUser;
   const url = signedIn ? (CAMERA_URL || (CAM_IS_STAGING ? CAM_DEMO_URL : '')) : '';
   const win = url ? currentWindow(new Date()) : null;
-  const show = signedIn && !!url && (CAM_IS_STAGING || !!win);   // login required; staging: always; prod: in-window
+  const show = signedIn && !!url && !!win;   // login required AND only during carpool windows
   if(show){
     if(!b){ b=document.createElement('a'); b.id='camBanner'; b.className='cam-banner';
       b.target='_blank'; b.rel='noopener';
