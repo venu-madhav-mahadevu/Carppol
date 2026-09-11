@@ -2187,19 +2187,27 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
   }, ()=>{});
 })();
 
-// ---- Live camera quick-launch — shows only during carpool windows (morning/afternoon) ----
+// ---- Live camera quick-launch ----
+// PROD: shows only during the morning/afternoon carpool windows, and only when a link is set.
+// STAGING: always visible (preview), falling back to a demo Ring link so you can verify it any time.
+const CAM_IS_STAGING = (DB_PREFIX==='stg/');
+const CAM_DEMO_URL   = 'https://account.ring.com';
 function updateCameraBanner(){
   let b=document.getElementById('camBanner');
-  const w=CAMERA_URL ? currentWindow(new Date()) : null;
-  if(w){
+  const url = CAMERA_URL || (CAM_IS_STAGING ? CAM_DEMO_URL : '');
+  const win = url ? currentWindow(new Date()) : null;
+  const show = !!url && (CAM_IS_STAGING || !!win);   // staging: always; prod: only in a window
+  if(show){
     if(!b){ b=document.createElement('a'); b.id='camBanner'; b.className='cam-banner';
       b.target='_blank'; b.rel='noopener';
       const mast=document.querySelector('.masthead');
       if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
       else document.querySelector('.wrap').prepend(b); }
-    b.href=CAMERA_URL;
+    b.href=url;
+    const label = win ? esc(win.label)+' carpool' : 'preview';
+    const demoNote = (CAM_IS_STAGING && !CAMERA_URL) ? ' <small style="opacity:.8">(demo link — set yours in admin)</small>' : '';
     b.innerHTML='<span class="cb-ic">📹</span>'+
-      '<div class="cb-txt"><b>Live camera — '+esc(w.label)+' carpool</b>'+
+      '<div class="cb-txt"><b>Live camera — '+label+'</b>'+demoNote+
       '<small>Tap to watch the pickup / drop-off at the house</small></div>'+
       '<span class="cb-go">Watch ›</span>';
     b.hidden=false;
