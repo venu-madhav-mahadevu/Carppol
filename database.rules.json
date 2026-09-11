@@ -28,6 +28,7 @@
     "kids":     { ".read": "auth != null", ".write": "auth != null" },
     "swaps":    { ".read": "auth != null", ".write": "auth != null" },
     "messages": { ".read": "auth != null", ".write": "auth != null" },
+    "secure":   { ".read": "auth != null", ".write": "auth != null" },
 
     "stg": {
       "config":   { ".read": true, ".write": "auth != null" },
@@ -43,7 +44,8 @@
       },
       "kids":     { ".read": "auth != null", ".write": "auth != null" },
       "swaps":    { ".read": "auth != null", ".write": "auth != null" },
-      "messages": { ".read": "auth != null", ".write": "auth != null" }
+      "messages": { ".read": "auth != null", ".write": "auth != null" },
+      "secure":   { ".read": "auth != null", ".write": "auth != null" }
     },
 
     "demo": {

@@ -2202,20 +2202,38 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
     if(cfg.subtitle!=null){ const s=document.querySelector('.sub'); if(s) s.textContent=cfg.subtitle; }
     if(cfg.schoolUrl){ SCHOOL_URL=cfg.schoolUrl; }
     if(cfg.whatsapp!=null){ GROUP_WHATSAPP=cfg.whatsapp; }
-    if(cfg.cameraUrl!=null){ CAMERA_URL=cfg.cameraUrl; updateCameraBanner(); }
   }, ()=>{});
 })();
 
+// ---- Camera link is PRIVATE: stored at auth-gated /secure/cameraUrl, read only when signed in ----
+(function loadCameraConfig(){
+  if(!fbOK) return;
+  let camRef=null;
+  fbAuth.onAuthStateChanged(u=>{
+    if(u){
+      if(!camRef){
+        camRef=dref('secure/cameraUrl');
+        camRef.on('value', s=>{ CAMERA_URL = s.val()||''; updateCameraBanner(); }, ()=>{ /* denied → leave empty */ });
+      }
+    } else {
+      if(camRef){ camRef.off(); camRef=null; }
+      CAMERA_URL=''; updateCameraBanner();   // hide the camera when signed out
+    }
+  });
+})();
+
 // ---- Live camera quick-launch ----
+// PRIVATE: only signed-in families ever see it (the link lives at auth-gated /secure/cameraUrl).
 // PROD: shows only during the morning/afternoon carpool windows, and only when a link is set.
-// STAGING: always visible (preview), falling back to a demo Ring link so you can verify it any time.
+// STAGING: always visible once signed in (preview), with a demo link fallback to verify it.
 const CAM_IS_STAGING = (DB_PREFIX==='stg/');
 const CAM_DEMO_URL   = 'https://account.ring.com';
 function updateCameraBanner(){
   let b=document.getElementById('camBanner');
-  const url = CAMERA_URL || (CAM_IS_STAGING ? CAM_DEMO_URL : '');
+  const signedIn = !!currentUser;
+  const url = signedIn ? (CAMERA_URL || (CAM_IS_STAGING ? CAM_DEMO_URL : '')) : '';
   const win = url ? currentWindow(new Date()) : null;
-  const show = !!url && (CAM_IS_STAGING || !!win);   // staging: always; prod: only in a window
+  const show = signedIn && !!url && (CAM_IS_STAGING || !!win);   // login required; staging: always; prod: in-window
   if(show){
     if(!b){ b=document.createElement('a'); b.id='camBanner'; b.className='cam-banner';
       b.target='_blank'; b.rel='noopener';

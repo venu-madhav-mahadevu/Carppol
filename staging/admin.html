@@ -116,9 +116,10 @@ function render(){
   dref('config/header').once('value').then(s=>{ const v=s.val()||{};
     if(document.getElementById('fOrg')){ document.getElementById('fOrg').value=v.org||'';
       document.getElementById('fTitle').value=v.title||''; document.getElementById('fSub').value=v.subtitle||'';
-      document.getElementById('fUrl').value=v.schoolUrl||''; document.getElementById('fWa').value=v.whatsapp||'';
-      if(document.getElementById('fCam')) document.getElementById('fCam').value=v.cameraUrl||''; }
+      document.getElementById('fUrl').value=v.schoolUrl||''; document.getElementById('fWa').value=v.whatsapp||''; }
   }).catch(()=>{});
+  // camera link is private → read from the auth-gated /secure/cameraUrl node
+  dref('secure/cameraUrl').once('value').then(s=>{ if(document.getElementById('fCam')) document.getElementById('fCam').value=s.val()||''; }).catch(()=>{});
 }
 // ---- Bell schedule upload ----
 let parsedSchedule=null;
@@ -230,8 +231,12 @@ function saveHeader(){
   const whatsapp=document.getElementById('fWa').value.trim();
   const cameraUrl=document.getElementById('fCam')?document.getElementById('fCam').value.trim():'';
   const m=document.getElementById('hmsg'); m.className='msg'; m.textContent='Saving…';
-  dref('config/header').set({org,title,subtitle,schoolUrl,whatsapp,cameraUrl,by:user.uid,ts:Date.now()})
-    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  (open the calendar to see it)'; })
+  // public display fields → /config/header ; private camera link → auth-gated /secure/cameraUrl
+  Promise.all([
+    dref('config/header').set({org,title,subtitle,schoolUrl,whatsapp,by:user.uid,ts:Date.now()}),
+    dref('secure/cameraUrl').set(cameraUrl)
+  ])
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  (camera link kept private — signed-in families only)'; })
     .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
 }
 </script>
