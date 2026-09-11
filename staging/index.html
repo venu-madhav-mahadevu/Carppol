@@ -602,6 +602,15 @@
   .cam-modal .cm-note{color:#9fb0d0;font-size:12px;margin:9px 4px 2px;}
   .cam-modal .cm-x{position:absolute;top:9px;right:11px;z-index:2;width:32px;height:32px;border:none;cursor:pointer;
     border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:19px;line-height:1;}
+  .cam-modal .cm-connect{color:#e7eefb;padding:2px 4px;}
+  .cam-modal .cm-status{font-size:15px;margin-bottom:8px;}
+  .cam-modal .cm-lead{font-size:13px;line-height:1.5;color:#c3d0ea;margin:0 0 12px;}
+  .cam-modal .cm-steps{margin:0 0 14px;padding-left:20px;font-size:12.5px;line-height:1.6;color:#c3d0ea;}
+  .cam-modal .cm-steps code{background:rgba(255,255,255,.12);padding:1px 5px;border-radius:5px;font-size:11.5px;}
+  .cam-modal .cm-actions{display:flex;gap:9px;flex-wrap:wrap;}
+  .cam-modal .cm-btn{font:inherit;font-weight:700;font-size:12.5px;text-decoration:none;padding:9px 15px;border-radius:11px;
+    background:rgba(255,255,255,.12);color:#fff;}
+  .cam-modal .cm-btn.primary{background:linear-gradient(120deg,#2563EB,#0EA5E9);}
   .swap-toast{position:fixed;top:64px;right:14px;z-index:10001;max-width:290px;line-height:1.35;
     background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
     border:1px solid var(--glass-brd);border-radius:14px;padding:11px 14px;font-size:12.5px;cursor:pointer;
@@ -2214,37 +2223,62 @@ function updateCameraBanner(){
       if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
       else document.querySelector('.wrap').prepend(b); }
     b.href=url;
-    const live = isHlsUrl(url);   // .m3u8 from the Ring bridge → play inline; otherwise open the link
-    b.onclick = live ? (e=>{ e.preventDefault(); openCameraModal(url, win); }) : null;
+    const live = isHlsUrl(url);   // .m3u8 from the Ring bridge → live feed connected
+    // Always open the modal (either the live feed, or the "Connect Ring" panel).
+    b.onclick = (e=>{ e.preventDefault(); openCameraModal(url, win); });
     const label = win ? esc(win.label)+' carpool' : 'preview';
     const demoNote = (CAM_IS_STAGING && !CAMERA_URL) ? ' <small style="opacity:.8">(demo link — set yours in admin)</small>' : '';
     b.innerHTML='<span class="cb-ic">📹</span>'+
       '<div class="cb-txt"><b>Live camera — '+label+'</b>'+demoNote+
-      '<small>'+(live?'Tap to watch the live feed here':'Tap to watch the pickup / drop-off at the house')+'</small></div>'+
-      '<span class="cb-go">'+(live?'▶ Watch live':'Watch ›')+'</span>';
+      '<small>'+(live?'Tap to watch the live feed here':'Tap to connect your Ring camera')+'</small></div>'+
+      '<span class="cb-go">'+(live?'▶ Watch live':'Connect Ring')+'</span>';
     b.hidden=false;
   } else if(b){ b.hidden=true; }
 }
 function isHlsUrl(u){ return /\.m3u8(\?|#|$)/i.test(u||''); }
-// Inline live player for a bridge HLS stream (Ring key stays on the bridge, never here).
+// Camera modal: plays the live HLS feed when the bridge is connected, otherwise shows
+// a "Connect Ring" panel with the steps. The Ring key always lives on the bridge, never here.
 function openCameraModal(url, win){
   let ov=document.getElementById('camModal');
   if(!ov){
     ov=document.createElement('div'); ov.id='camModal'; ov.className='cam-modal';
     ov.innerHTML='<div class="cm-card"><button class="cm-x" type="button" aria-label="Close">×</button>'+
       '<div class="cm-head">📹 <b class="cm-title">Live camera</b></div>'+
-      '<video class="cm-video" playsinline autoplay muted controls></video>'+
+      '<div class="cm-body"></div>'+
       '<div class="cm-note"></div></div>';
     document.body.appendChild(ov);
-    const close=()=>{ const v=ov.querySelector('.cm-video'); try{ if(v._hls){v._hls.destroy(); v._hls=null;} v.pause(); v.removeAttribute('src'); v.load(); }catch(_){} ov.hidden=true; };
+    const close=()=>{ const v=ov.querySelector('.cm-video'); if(v){ try{ if(v._hls){v._hls.destroy(); v._hls=null;} v.pause(); v.removeAttribute('src'); v.load(); }catch(_){} } ov.hidden=true; };
     ov.querySelector('.cm-x').onclick=close;
     ov.addEventListener('click',e=>{ if(e.target===ov) close(); });
+    ov._close=close;
   }
+  const body=ov.querySelector('.cm-body');
   ov.querySelector('.cm-title').textContent = 'Live camera'+(win?(' — '+win.label+' carpool'):'');
-  ov.querySelector('.cm-note').textContent = 'Streaming from your home camera bridge.';
   ov.hidden=false;
-  const v=ov.querySelector('.cm-video');
-  playHls(v, url);
+  if(isHlsUrl(url)){
+    // Connected → play the live feed inline.
+    body.innerHTML='<video class="cm-video" playsinline autoplay muted controls></video>';
+    ov.querySelector('.cm-note').textContent='🟢 Connected — streaming live from your home camera bridge.';
+    playHls(body.querySelector('.cm-video'), url);
+  } else {
+    // Not connected → show the Connect Ring panel.
+    const openHref = (url && /^https?:/i.test(url)) ? url : 'https://account.ring.com';
+    body.innerHTML=
+      '<div class="cm-connect">'+
+        '<div class="cm-status">🔴 <b>Ring not connected yet</b></div>'+
+        '<p class="cm-lead">To watch the live feed <b>inside this calendar</b>, connect your Ring once through a small secure bridge. Your Ring key stays on the bridge — never in this webpage.</p>'+
+        '<ol class="cm-steps">'+
+          '<li>Run the <b>ring-bridge</b> on an always-on device (PC / Raspberry Pi). It logs into Ring with your token.</li>'+
+          '<li>Expose it with a free tunnel to get an <code>https://…</code> address.</li>'+
+          '<li>Paste <code>https://…/live/stream.m3u8</code> into <b>Admin → Live camera link</b>.</li>'+
+        '</ol>'+
+        '<div class="cm-actions">'+
+          '<a class="cm-btn primary" href="'+esc(openHref)+'" target="_blank" rel="noopener">Open Ring app ↗</a>'+
+          '<a class="cm-btn" href="admin.html" target="_blank" rel="noopener">Go to Admin ↗</a>'+
+        '</div>'+
+      '</div>';
+    ov.querySelector('.cm-note').textContent='Once the bridge link is saved, this button plays the feed here automatically.';
+  }
 }
 function playHls(video, url){
   if(video.canPlayType('application/vnd.apple.mpegurl')){ video.src=url; video.play().catch(()=>{}); return; }
