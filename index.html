@@ -580,6 +580,48 @@
   .swap-banner .sb-txt b{font-weight:800;}
   .swap-banner .sb-view{font:inherit;font-weight:800;font-size:12.5px;color:#C2620A;background:#fff;border:none;
     border-radius:20px;padding:7px 15px;cursor:pointer;flex:none;}
+  .cam-banner{display:flex;align-items:center;gap:11px;margin-bottom:16px;padding:12px 15px;border-radius:14px;
+    color:#fff;background:linear-gradient(120deg,#2563EB,#0EA5E9);box-shadow:0 12px 30px -14px rgba(37,99,235,.6);
+    animation:riseIn .5s cubic-bezier(.2,.7,.3,1) both;text-decoration:none;}
+  .cam-banner .cb-ic{font-size:20px;flex:none;position:relative;}
+  .cam-banner .cb-ic::after{content:"";position:absolute;top:-1px;right:-3px;width:7px;height:7px;border-radius:50%;
+    background:#EF4444;box-shadow:0 0 0 0 rgba(239,68,68,.7);animation:campulse 1.4s ease-out infinite;}
+  .cam-banner .cb-txt{flex:1;font-size:13.5px;line-height:1.3;}
+  .cam-banner .cb-txt b{font-weight:800;}
+  .cam-banner .cb-txt small{display:block;opacity:.85;font-size:11.5px;font-weight:600;margin-top:1px;}
+  .cam-banner .cb-go{font:inherit;font-weight:800;font-size:12.5px;color:#1D4ED8;background:#fff;
+    border-radius:20px;padding:7px 15px;flex:none;}
+  @keyframes campulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.7);}70%{box-shadow:0 0 0 7px rgba(239,68,68,0);}100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}}
+  [hidden]{display:none!important;}
+  .cam-modal{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;
+    padding:18px;background:rgba(10,14,25,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}
+  .cam-modal .cm-card{position:relative;width:min(760px,100%);background:#0b1020;border-radius:16px;padding:14px;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.7);}
+  .cam-modal .cm-head{color:#fff;font-size:15px;margin:2px 4px 10px;display:flex;gap:7px;align-items:center;}
+  .cam-modal .cm-title{font-weight:800;}
+  .cam-modal .cm-stage{position:relative;width:100%;aspect-ratio:16/9;border-radius:11px;overflow:hidden;background:#000;}
+  .cam-modal .cm-video{width:100%;height:100%;background:#000;display:block;object-fit:contain;}
+  .cam-modal .cm-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;text-align:center;color:#e7eefb;background:rgba(6,10,20,.86);padding:18px;}
+  .cam-modal .cm-spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;
+    animation:cmspin .8s linear infinite;}
+  @keyframes cmspin{to{transform:rotate(360deg);}}
+  .cam-modal .cm-off-ic{font-size:34px;}
+  .cam-modal .cm-off-msg{font-size:13px;line-height:1.5;}
+  .cam-modal .cm-off-msg span{color:#9fb0d0;}
+  .cam-modal .cm-retry{border:none;cursor:pointer;margin-top:2px;}
+  .cam-modal .cm-note{color:#9fb0d0;font-size:12px;margin:9px 4px 2px;}
+  .cam-modal .cm-x{position:absolute;top:9px;right:11px;z-index:2;width:32px;height:32px;border:none;cursor:pointer;
+    border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:19px;line-height:1;}
+  .cam-modal .cm-connect{color:#e7eefb;padding:2px 4px;}
+  .cam-modal .cm-status{font-size:15px;margin-bottom:8px;}
+  .cam-modal .cm-lead{font-size:13px;line-height:1.5;color:#c3d0ea;margin:0 0 12px;}
+  .cam-modal .cm-steps{margin:0 0 14px;padding-left:20px;font-size:12.5px;line-height:1.6;color:#c3d0ea;}
+  .cam-modal .cm-steps code{background:rgba(255,255,255,.12);padding:1px 5px;border-radius:5px;font-size:11.5px;}
+  .cam-modal .cm-actions{display:flex;gap:9px;flex-wrap:wrap;}
+  .cam-modal .cm-btn{font:inherit;font-weight:700;font-size:12.5px;text-decoration:none;padding:9px 15px;border-radius:11px;
+    background:rgba(255,255,255,.12);color:#fff;}
+  .cam-modal .cm-btn.primary{background:linear-gradient(120deg,#2563EB,#0EA5E9);}
   .swap-toast{position:fixed;top:64px;right:14px;z-index:10001;max-width:290px;line-height:1.35;
     background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
     border:1px solid var(--glass-brd);border-radius:14px;padding:11px 14px;font-size:12.5px;cursor:pointer;
@@ -756,6 +798,7 @@ const CONTACTS = {
 // Paste your WhatsApp group invite link here (https://chat.whatsapp.com/....) or leave '' :
 let GROUP_WHATSAPP = '';                                    // admin-configurable
 let SCHOOL_URL = 'https://fremontunified.org/thornton/';    // admin-configurable
+let CAMERA_URL = '';   // your Ring / camera live-view link — shown during carpool windows (admin-configurable)
 
 /* ===== EDIT HERE: auto-record windows (24-hour HH:MM). On minimum days the
    afternoon automatically uses minDayAfternoon instead of afternoon. */
@@ -2172,6 +2215,165 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
     if(cfg.whatsapp!=null){ GROUP_WHATSAPP=cfg.whatsapp; }
   }, ()=>{});
 })();
+
+// ---- Camera link is PRIVATE: stored at auth-gated /secure/cameraUrl, read only when signed in ----
+(function loadCameraConfig(){
+  if(!fbOK) return;
+  let camRef=null;
+  fbAuth.onAuthStateChanged(u=>{
+    if(u){
+      if(!camRef){
+        camRef=dref('secure/cameraUrl');
+        camRef.on('value', s=>{ CAMERA_URL = s.val()||''; updateCameraBanner(); }, ()=>{ /* denied → leave empty */ });
+      }
+    } else {
+      if(camRef){ camRef.off(); camRef=null; }
+      CAMERA_URL=''; updateCameraBanner();   // hide the camera when signed out
+    }
+  });
+})();
+
+// ---- Live camera quick-launch ----
+// PRIVATE: only signed-in families ever see it (the link lives at auth-gated /secure/cameraUrl).
+// TIMING: shows ONLY during the morning/afternoon carpool windows (every environment).
+const CAM_IS_STAGING = (DB_PREFIX==='stg/');
+const CAM_DEMO_URL   = 'https://account.ring.com';
+function updateCameraBanner(){
+  let b=document.getElementById('camBanner');
+  const signedIn = !!currentUser;
+  const url = signedIn ? (CAMERA_URL || (CAM_IS_STAGING ? CAM_DEMO_URL : '')) : '';
+  const win = url ? currentWindow(new Date()) : null;
+  const show = signedIn && !!url && !!win;   // login required AND only during carpool windows
+  if(show){
+    if(!b){ b=document.createElement('a'); b.id='camBanner'; b.className='cam-banner';
+      b.target='_blank'; b.rel='noopener';
+      const mast=document.querySelector('.masthead');
+      if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
+      else document.querySelector('.wrap').prepend(b); }
+    b.href=url;
+    const live = isHlsUrl(url);   // .m3u8 from the Ring bridge → live feed connected
+    // Always open the modal (either the live feed, or the "Connect Ring" panel).
+    b.onclick = (e=>{ e.preventDefault(); openCameraModal(url, win); });
+    const label = win ? esc(win.label)+' carpool' : 'preview';
+    const demoNote = (CAM_IS_STAGING && !CAMERA_URL) ? ' <small style="opacity:.8">(demo link — set yours in admin)</small>' : '';
+    b.innerHTML='<span class="cb-ic">📹</span>'+
+      '<div class="cb-txt"><b>Live camera — '+label+'</b>'+demoNote+
+      '<small>'+(live?'Tap to watch the live feed here':'Tap to connect your Ring camera')+'</small></div>'+
+      '<span class="cb-go">'+(live?'▶ Watch live':'Connect Ring')+'</span>';
+    b.hidden=false;
+  } else if(b){ b.hidden=true; }
+}
+function isHlsUrl(u){ return /\.m3u8(\?|#|$)/i.test(u||''); }
+// Camera modal: plays the live HLS feed when the bridge is connected, otherwise shows
+// a "Connect Ring" panel with the steps. The Ring key always lives on the bridge, never here.
+function openCameraModal(url, win){
+  let ov=document.getElementById('camModal');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='camModal'; ov.className='cam-modal';
+    ov.innerHTML='<div class="cm-card"><button class="cm-x" type="button" aria-label="Close">×</button>'+
+      '<div class="cm-head">📹 <b class="cm-title">Live camera</b></div>'+
+      '<div class="cm-body"></div>'+
+      '<div class="cm-note"></div></div>';
+    document.body.appendChild(ov);
+    const close=()=>{ try{ if(ov._onClose) ov._onClose(); }catch(_){} const v=ov.querySelector('.cm-video'); if(v){ try{ if(v._hls){v._hls.destroy(); v._hls=null;} v.pause(); v.removeAttribute('src'); v.load(); }catch(_){} } ov.hidden=true; };
+    ov.querySelector('.cm-x').onclick=close;
+    ov.addEventListener('click',e=>{ if(e.target===ov) close(); });
+    ov._close=close;
+  }
+  const body=ov.querySelector('.cm-body');
+  ov.querySelector('.cm-title').textContent = 'Live camera'+(win?(' — '+win.label+' carpool'):'');
+  ov.hidden=false;
+  if(isHlsUrl(url)){
+    // Connected → play the live feed inline, with connecting / offline / retry states.
+    body.innerHTML=
+      '<div class="cm-stage">'+
+        '<video class="cm-video" playsinline autoplay muted controls></video>'+
+        '<div class="cm-overlay cm-loading"><div class="cm-spin"></div><div>Connecting to camera…</div></div>'+
+        '<div class="cm-overlay cm-offline" hidden>'+
+          '<div class="cm-off-ic">📷</div>'+
+          '<div class="cm-off-msg"><b>Camera offline</b><br><span>The home bridge or tunnel may be off. Check both are running.</span></div>'+
+          '<button class="cm-btn primary cm-retry" type="button">↻ Reconnect</button>'+
+        '</div>'+
+      '</div>';
+    ov.querySelector('.cm-note').textContent='🟢 Live from your home camera — about 6–10s behind real time.';
+    startCamStream(ov, url);
+  } else {
+    // Not connected → show the Connect Ring panel.
+    const openHref = (url && /^https?:/i.test(url)) ? url : 'https://account.ring.com';
+    body.innerHTML=
+      '<div class="cm-connect">'+
+        '<div class="cm-status">🔴 <b>Ring not connected yet</b></div>'+
+        '<p class="cm-lead">To watch the live feed <b>inside this calendar</b>, connect your Ring once through a small secure bridge. Your Ring key stays on the bridge — never in this webpage.</p>'+
+        '<ol class="cm-steps">'+
+          '<li>Run the <b>ring-bridge</b> on an always-on device (PC / Raspberry Pi). It logs into Ring with your token.</li>'+
+          '<li>Expose it with a free tunnel to get an <code>https://…</code> address.</li>'+
+          '<li>Paste <code>https://…/live/stream.m3u8</code> into <b>Admin → Live camera link</b>.</li>'+
+        '</ol>'+
+        '<div class="cm-actions">'+
+          '<a class="cm-btn primary" href="'+esc(openHref)+'" target="_blank" rel="noopener">Open Ring app ↗</a>'+
+          '<a class="cm-btn" href="admin.html" target="_blank" rel="noopener">Go to Admin ↗</a>'+
+        '</div>'+
+      '</div>';
+    ov.querySelector('.cm-note').textContent='Once the bridge link is saved, this button plays the feed here automatically.';
+  }
+}
+// Robust stream loader: shows connecting spinner, an offline card with Reconnect,
+// and auto-retries on stalls. `ov` is the modal, so we can flip overlays.
+function startCamStream(ov, url){
+  const stage   = ov.querySelector('.cm-stage');
+  const video   = ov.querySelector('.cm-video');
+  const loading = ov.querySelector('.cm-loading');
+  const offline = ov.querySelector('.cm-offline');
+  if(!video) return;
+  let watchdog=null, gotFrames=false;
+  const showLoading =()=>{ if(loading) loading.hidden=false; if(offline) offline.hidden=true; };
+  const showOffline =()=>{ if(loading) loading.hidden=true; if(offline) offline.hidden=false; };
+  const hideOverlays=()=>{ if(loading) loading.hidden=true; if(offline) offline.hidden=true; };
+  const armWatchdog =()=>{ clearTimeout(watchdog); watchdog=setTimeout(()=>{ if(!gotFrames) showOffline(); }, 14000); };
+  const cleanup =()=>{ clearTimeout(watchdog); try{ if(video._hls){video._hls.destroy(); video._hls=null;} }catch(_){} };
+  // when real frames arrive, drop the overlay
+  video.addEventListener('playing', ()=>{ gotFrames=true; hideOverlays(); });
+  video.addEventListener('waiting', ()=>{ if(gotFrames && loading){ /* brief buffering, stay quiet */ } });
+
+  function start(){
+    gotFrames=false; showLoading(); armWatchdog();
+    // Safari / iOS: native HLS
+    if(video.canPlayType('application/vnd.apple.mpegurl')){
+      video.src=url; video.play().catch(()=>{});
+      video.onerror=()=>showOffline();
+      return;
+    }
+    const attach=()=>{
+      try{
+        if(video._hls) video._hls.destroy();
+        const h=new window.Hls({liveDurationInfinity:true, manifestLoadingMaxRetry:2, levelLoadingMaxRetry:2});
+        h.loadSource(url); h.attachMedia(video);
+        h.on(window.Hls.Events.MANIFEST_PARSED, ()=>video.play().catch(()=>{}));
+        h.on(window.Hls.Events.ERROR, (_e,data)=>{
+          if(!data || !data.fatal) return;
+          if(data.type===window.Hls.ErrorTypes.NETWORK_ERROR){ try{ h.startLoad(); }catch(_){ showOffline(); } }
+          else if(data.type===window.Hls.ErrorTypes.MEDIA_ERROR){ try{ h.recoverMediaError(); }catch(_){ showOffline(); } }
+          else { showOffline(); }
+        });
+        video._hls=h;
+      }catch(e){ showOffline(); }
+    };
+    if(window.Hls){ attach(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js';
+    s.onload=attach; s.onerror=showOffline;
+    document.head.appendChild(s);
+  }
+  // Reconnect button
+  const retry=ov.querySelector('.cm-retry');
+  if(retry) retry.onclick=()=>{ cleanup(); start(); };
+  // stop everything when the modal closes
+  ov._onClose = cleanup;
+  start();
+}
+setInterval(updateCameraBanner, 30000);
+document.addEventListener('DOMContentLoaded', updateCameraBanner);
+updateCameraBanner();
 
 // ---- Rebuild the whole calendar from data (used when the bell schedule changes) ----
 function rebuildCalendar(){
