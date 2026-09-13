@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Camera</title>
+<style>
+  :root{ color-scheme:light dark; --bg:#0b1020; --card:#121a30; --ink:#e8eefc; --sub:#93a4c6; --brd:#243256; --accent:#2563EB; --accent2:#0EA5E9; --ok:#10B981; --bad:#EF4444; }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(160deg,#0b1020,#0e1630);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px;}
+  .card{width:100%;max-width:720px;background:var(--card);border:1px solid var(--brd);border-radius:18px;padding:20px;box-shadow:0 30px 80px -30px rgba(0,0,0,.7);}
+  h1{font-size:19px;margin:0 0 2px;display:flex;align-items:center;gap:9px}
+  .sub{color:var(--sub);font-size:13px;margin:0 0 16px}
+  .stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:12px}
+  video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:18px;background:rgba(6,10,20,.9)}
+  .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.22);border-top-color:#fff;animation:s .8s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .ic{font-size:36px}
+  .msg b{display:block;font-size:15px;margin-bottom:2px}
+  .msg span{color:var(--sub);font-size:13px}
+  label{display:block;font-size:12.5px;color:var(--sub);margin:12px 0 5px;font-weight:600}
+  input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--brd);background:#0c1428;color:var(--ink);font:inherit}
+  input:focus{outline:none;border-color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;gap:7px;justify-content:center;width:100%;margin-top:14px;padding:12px;border:none;border-radius:11px;
+    background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;font:inherit;font-weight:800;cursor:pointer}
+  .btn.sec{background:#1b2b4d;color:var(--ink);border:1px solid var(--brd)}
+  .row2{display:flex;gap:10px}
+  .row2>div{flex:1}
+  .note{margin-top:12px;font-size:12.5px;color:var(--sub)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:20px}
+  .pill.live{background:rgba(16,185,129,.15);color:#34d399}
+  .center{text-align:center}
+  .hide{display:none!important}
+  a{color:#7cc0ff}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📹 <span id="ttl">Live Camera</span></h1>
+  <p class="sub" id="sub">Private live view — access by approval only.</p>
+
+  <!-- WATCH (token present) -->
+  <div id="watch" class="hide">
+    <div class="stage">
+      <video id="vid" playsinline autoplay muted controls></video>
+      <div id="ovLoad" class="overlay"><div class="spin"></div><div>Connecting to camera…</div></div>
+      <div id="ovErr" class="overlay hide">
+        <div class="ic">📷</div>
+        <div class="msg"><b id="errT">Camera offline</b><span id="errS">The camera bridge may be off, or your access was revoked.</span></div>
+        <button class="btn" style="max-width:200px" id="retry">↻ Reconnect</button>
+      </div>
+    </div>
+    <div class="center"><span class="pill live">● LIVE · ~6–10s delay</span></div>
+  </div>
+
+  <!-- REQUEST (no token) -->
+  <div id="req" class="hide">
+    <div class="row2">
+      <div><label>First name</label><input id="rFirst" placeholder="Jane" autocomplete="given-name"></div>
+      <div><label>Last name</label><input id="rLast" placeholder="Smith" autocomplete="family-name"></div>
+    </div>
+    <div class="row2">
+      <div><label>Phone number</label><input id="rPhone" type="tel" placeholder="(555) 123-4567" autocomplete="tel"></div>
+      <div><label>House number</label><input id="rHouse" placeholder="e.g. 42"></div>
+    </div>
+    <button class="btn" id="rSend">Request access</button>
+    <div class="note" id="rMsg">The owner will review your request and send you a private link if approved.</div>
+  </div>
+
+  <!-- STATES -->
+  <div id="msgBox" class="hide center" style="padding:22px 8px">
+    <div class="ic" id="mIc">✅</div>
+    <div class="msg" style="margin-top:8px"><b id="mT">Done</b><span id="mS"></span></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js"></script>
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDP7FpkwN9oWInx5RU2LrfD9uwnm28I4j4",
+  authDomain: "carpool-67212.firebaseapp.com",
+  databaseURL: "https://carpool-67212-default-rtdb.firebaseio.com",
+  projectId: "carpool-67212",
+  storageBucket: "carpool-67212.firebasestorage.app",
+  messagingSenderId: "1064173394713",
+  appId: "1:1064173394713:web:715389acb190e3ded54388"
+};
+let db=null;
+try{ firebase.initializeApp(FIREBASE_CONFIG); db=firebase.database(); }catch(e){ console.warn('fb init',e); }
+
+const $=id=>document.getElementById(id);
+const show=(el,on)=>{ el.classList.toggle('hide', !on); };
+const token=new URLSearchParams(location.search).get('t')||'';
+
+function showMsg(ic,title,sub){ $('mIc').textContent=ic; $('mT').textContent=title; $('mS').textContent=sub||''; show($('watch'),false); show($('req'),false); show($('msgBox'),true); }
+
+if(token){
+  // WATCH MODE
+  show($('watch'),true);
+  db.ref('access/streamBase').once('value').then(s=>{
+    const base=(s.val()||'').replace(/\/+$/,'');
+    if(!base){ return showMsg('⚙️','Not set up yet','The camera link has not been configured. Check back soon.'); }
+    startStream(base+'/live/stream.m3u8?k='+encodeURIComponent(token));
+  }).catch(()=>{ startStreamFallback(); });
+}else{
+  // REQUEST MODE
+  show($('req'),true);
+  $('rSend').onclick=()=>{
+    const first=$('rFirst').value.trim(), last=$('rLast').value.trim(),
+          phone=$('rPhone').value.trim(), house=$('rHouse').value.trim();
+    const digits=phone.replace(/\D/g,'');
+    if(!first||!last){ $('rMsg').textContent='Please enter your first and last name.'; return; }
+    if(digits.length<7){ $('rMsg').textContent='Please enter a valid phone number.'; return; }
+    if(!house){ $('rMsg').textContent='Please enter your house number.'; return; }
+    $('rSend').disabled=true; $('rMsg').textContent='Sending…';
+    db.ref('access/requests').push({ first, last, name:first+' '+last, phone, house, status:'pending', ts:Date.now(), ua:navigator.userAgent.slice(0,120) })
+      .then(()=>showMsg('📨','Request sent','The owner will review it and send you a private viewing link if approved.'))
+      .catch(e=>{ $('rSend').disabled=false; $('rMsg').textContent='Could not send: '+(e.message||''); });
+  };
+}
+
+function startStreamFallback(){ showMsg('⚠️','Cannot load','Could not read the camera configuration.'); }
+
+function startStream(url){
+  const v=$('vid'), load=$('ovLoad'), err=$('ovErr');
+  let gotFrames=false, wd=null, hls=null;
+  const showLoad=()=>{ show(load,true); show(err,false); };
+  const showErr=(t,s)=>{ if(t)$('errT').textContent=t; if(s)$('errS').textContent=s; show(load,false); show(err,true); };
+  const hideAll=()=>{ show(load,false); show(err,false); };
+  const arm=()=>{ clearTimeout(wd); wd=setTimeout(()=>{ if(!gotFrames) showErr('Camera offline','The bridge may be off, or your access was revoked.'); },14000); };
+  v.addEventListener('playing',()=>{ gotFrames=true; hideAll(); });
+  function go(){
+    gotFrames=false; showLoad(); arm();
+    if(v.canPlayType('application/vnd.apple.mpegurl')){ v.src=url; v.play().catch(()=>{}); v.onerror=()=>showErr(); return; }
+    try{
+      if(hls) hls.destroy();
+      hls=new Hls({liveDurationInfinity:true, manifestLoadingMaxRetry:2, levelLoadingMaxRetry:2,
+        xhrSetup:x=>{ try{ x.setRequestHeader('ngrok-skip-browser-warning','true'); }catch(_){} }});
+      hls.loadSource(url); hls.attachMedia(v);
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>v.play().catch(()=>{}));
+      hls.on(Hls.Events.ERROR,(_e,d)=>{
+        if(!d||!d.fatal) return;
+        if(d.type===Hls.ErrorTypes.NETWORK_ERROR){ try{ hls.startLoad(); }catch(_){ showErr(); } }
+        else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){ try{ hls.recoverMediaError(); }catch(_){ showErr(); } }
+        else showErr('Access ended','Your link may have been revoked, or the camera is offline.');
+      });
+    }catch(e){ showErr(); }
+  }
+  $('retry').onclick=()=>{ try{ if(hls) hls.destroy(); }catch(_){}; go(); };
+  go();
+}
+</script>
+</body>
+</html>

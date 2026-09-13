@@ -30,6 +30,16 @@
     "messages": { ".read": "auth != null", ".write": "auth != null" },
     "secure":   { ".read": "auth != null", ".write": "auth != null" },
 
+    "access": {
+      "requests": {
+        ".read": "auth != null",
+        "$id": { ".write": "!data.exists() && newData.exists() || auth != null" }
+      },
+      "viewers":     { ".read": "auth != null", ".write": "auth != null" },
+      "tokenHashes": { ".read": true, ".write": "auth != null" },
+      "streamBase":  { ".read": true, ".write": "auth != null" }
+    },
+
     "stg": {
       "config":   { ".read": true, ".write": "auth != null" },
       "stats":    { ".read": true, ".write": true },

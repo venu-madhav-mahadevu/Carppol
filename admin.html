@@ -115,11 +115,23 @@ function render(){
     '<div style="display:flex;gap:8px;align-items:center"><input id="tmdS" type="time" style="flex:1"> <span>to</span> <input id="tmdE" type="time" style="flex:1"></div>'+
     '<button class="btn" id="saveTimes">Save times</button>'+
     '<div class="msg" id="tmsg"></div></div>'+
+    '<div class="card"><h2>👁️ External viewers (approval)</h2>'+
+    '<div class="desc">People who request access on your <b>watch page</b> (<code>watch.html</code>) appear here. Approve to create their private link; revoke anytime and their link stops working.</div>'+
+    '<label>Camera stream address <span style="font-weight:400;opacity:.7">(the https://… base of your bridge/tunnel — no /live)</span></label>'+
+    '<input id="sBase" type="url" placeholder="https://xxxx.trycloudflare.com">'+
+    '<button class="btn" id="saveBase">Save stream address</button>'+
+    '<div class="msg" id="bmsg"></div>'+
+    '<h3 style="margin:18px 0 6px;font-size:14px">Pending requests</h3><div id="reqList" class="desc">Loading…</div>'+
+    '<h3 style="margin:18px 0 6px;font-size:14px">Approved viewers</h3><div id="viewerList" class="desc">Loading…</div>'+
+    '<div class="msg" id="vmsg"></div></div>'+
     '<div class="card"><h2>More settings</h2>'+
     '<div class="soon">Contacts, kids, drivers and rotation editors are coming next.</div></div>';
   document.getElementById('outBtn').onclick=()=>auth.signOut();
   document.getElementById('saveHeader').onclick=saveHeader;
   document.getElementById('saveTimes').onclick=saveTimes;
+  document.getElementById('saveBase').onclick=saveStreamBase;
+  db.ref('access/streamBase').once('value').then(s=>{ const el=document.getElementById('sBase'); if(el) el.value=s.val()||''; }).catch(()=>{});
+  listenAccess();
   document.getElementById('dlTemplate').onclick=downloadTemplate;
   document.getElementById('schedFile').onchange=onSchedFile;
   document.getElementById('saveSched').onclick=saveSchedule;
@@ -233,6 +245,70 @@ function saveSchedule(){
   Promise.all([ dref('config/schedule').set(sched), dref('config/events').set(events) ])
     .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  calendar rebuilt · '+Object.keys(events).length+' days with school events.'; })
     .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+}
+// ===== External viewers: approval + revocation =====
+const WATCH_BASE = location.origin + '/Carppol/watch.html';
+function esc2(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function sha256hex(str){
+  const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function randToken(){ const a=new Uint8Array(24); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function saveStreamBase(){
+  const base=document.getElementById('sBase').value.trim().replace(/\/+$/,'');
+  const m=document.getElementById('bmsg'); m.className='msg'; m.textContent='Saving…';
+  db.ref('access/streamBase').set(base)
+    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓'; })
+    .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+}
+function listenAccess(){
+  db.ref('access/requests').on('value', snap=>{
+    const o=snap.val()||{}; const rows=Object.entries(o).filter(([,v])=>v&&(v.status||'pending')==='pending');
+    const el=document.getElementById('reqList'); if(!el) return;
+    if(!rows.length){ el.textContent='No pending requests.'; return; }
+    el.innerHTML=rows.map(([id,v])=>
+      '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
+        '<b>'+esc2(v.name||(v.first+' '+v.last))+'</b><br>'+
+        '<span style="color:#6b7280;font-size:12.5px">📞 '+esc2(v.phone||'—')+' · 🏠 House '+esc2(v.house||'—')+'</span><br>'+
+        '<button class="btn" style="width:auto;padding:7px 13px;margin-top:8px" data-ap="'+id+'">Approve</button> '+
+        '<button class="btn sec" style="width:auto;padding:7px 13px;margin-top:8px" data-dn="'+id+'">Deny</button>'+
+      '</div>').join('');
+    el.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>approveRequest(b.dataset.ap, o[b.dataset.ap]));
+    el.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>denyRequest(b.dataset.dn));
+  });
+  db.ref('access/viewers').on('value', snap=>{
+    const o=snap.val()||{}; const rows=Object.entries(o).filter(([,v])=>v&&v.active);
+    const el=document.getElementById('viewerList'); if(!el) return;
+    if(!rows.length){ el.textContent='No approved viewers yet.'; return; }
+    el.innerHTML=rows.map(([id,v])=>
+      '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
+        '<b>'+esc2(v.name)+'</b> <span style="color:#6b7280;font-size:12px">🏠 '+esc2(v.house||'—')+'</span><br>'+
+        '<input readonly value="'+esc2(WATCH_BASE+'?t='+v.token)+'" style="font-size:11.5px;margin:6px 0" onclick="this.select()">'+
+        '<button class="btn sec" style="width:auto;padding:6px 12px" data-cp="'+esc2(WATCH_BASE+'?t='+v.token)+'">Copy link</button> '+
+        '<button class="btn sec" style="width:auto;padding:6px 12px;color:#b91c1c" data-rv="'+id+'" data-hash="'+esc2(v.hash)+'">Revoke</button>'+
+      '</div>').join('');
+    el.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{ navigator.clipboard.writeText(b.dataset.cp); b.textContent='Copied ✓'; });
+    el.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>revokeViewer(b.dataset.rv, b.dataset.hash));
+  });
+}
+async function approveRequest(id, v){
+  const m=document.getElementById('vmsg'); m.className='msg'; m.textContent='Approving…';
+  try{
+    const token=randToken(); const hash=await sha256hex(token);
+    await db.ref('access/viewers/'+id).set({ name:v.name||((v.first||'')+' '+(v.last||'')).trim(), phone:v.phone||'', house:v.house||'', token, hash, active:true, ts:Date.now() });
+    await db.ref('access/tokenHashes/'+hash).set(true);
+    await db.ref('access/requests/'+id+'/status').set('approved');
+    m.className='msg ok'; m.textContent='Approved ✓ — private link created (copy it below and send to them).';
+  }catch(e){ m.className='msg err'; m.textContent='Could not approve: '+(e.message||''); }
+}
+function denyRequest(id){
+  db.ref('access/requests/'+id+'/status').set('denied').catch(()=>{});
+}
+function revokeViewer(id, hash){
+  const m=document.getElementById('vmsg'); m.className='msg'; m.textContent='Revoking…';
+  Promise.all([ db.ref('access/viewers/'+id+'/active').set(false), db.ref('access/tokenHashes/'+hash).remove() ])
+    .then(()=>{ m.className='msg ok'; m.textContent='Revoked ✓ — their link stops working within ~20s.'; })
+    .catch(e=>{ m.className='msg err'; m.textContent='Could not revoke: '+(e.message||''); });
 }
 function downloadTemplate(){
   const csv='date,type,label\n'+

@@ -22,6 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const http = require('http');
+const crypto = require('crypto');
 const cors = require('cors');
 const express = require('express');
 const { RingApi } = require('ring-client-api');
@@ -32,6 +33,24 @@ const PORT          = parseInt(process.env.PORT || '8123', 10);
 const ALLOW_ORIGIN  = process.env.ALLOW_ORIGIN || 'https://venu-madhav-mahadevu.github.io';
 const IDLE_STOP_MS  = parseInt(process.env.IDLE_STOP_MS || '60000', 10);
 const STREAM_KEY    = process.env.STREAM_KEY || '';   // shared secret; requests without it get 403
+// External approved viewers: the bridge syncs the set of active token *hashes* from Firebase
+// (a public-read path holding only hashes — safe) and accepts any token whose sha256 is in it.
+const VIEWERS_URL   = process.env.VIEWERS_URL || 'https://carpool-67212-default-rtdb.firebaseio.com/access/tokenHashes.json';
+let viewerHashes = new Set();
+async function syncViewers(){
+  try{
+    const r = await fetch(VIEWERS_URL, { signal: AbortSignal.timeout(8000) });
+    const j = (await r.json()) || {};
+    viewerHashes = new Set(Object.entries(j).filter(([,v]) => v).map(([h]) => h));
+  }catch(_){ /* keep last known set on error */ }
+}
+function tokenAllowed(k){
+  if (!k) return false;
+  if (STREAM_KEY && k === STREAM_KEY) return true;
+  const h = crypto.createHash('sha256').update(k).digest('hex');
+  return viewerHashes.has(h);
+}
+setInterval(syncViewers, 20000); syncViewers();
 
 if (!REFRESH_TOKEN) {
   console.error('\n[bridge] Missing RING_REFRESH_TOKEN. Run "npm run get-token" first (see README).\n');
@@ -125,7 +144,8 @@ app.get('/healthz', (_req, res) => res.json({ ok: true, streaming: !!liveCall, c
 // Require the shared secret on all /live/* requests. Without it → 403, so the public
 // tunnel URL alone is useless to anyone outside your families.
 app.use('/live', (req, res, next) => {
-  if (STREAM_KEY && req.query.k !== STREAM_KEY) return res.status(403).send('forbidden');
+  // allow the master key OR any approved external viewer token (checked by hash)
+  if (STREAM_KEY && !tokenAllowed(req.query.k)) return res.status(403).send('forbidden');
   next();
 });
 
@@ -138,9 +158,12 @@ app.get('/live/stream.m3u8', async (req, res) => {
     // wait up to ~8s for ffmpeg to write the first playlist
     for (let i = 0; i < 40 && !fs.existsSync(file); i++) await new Promise(r => setTimeout(r, 200));
     if (!fs.existsSync(file)) return res.status(503).send('stream warming up, retry');
-    // Rewrite segment names so each carries the key (relative URLs don't inherit ?k=).
+    // Rewrite segment names so each carries the SAME key the viewer used (relative URLs don't
+    // inherit ?k=). Using the requester's own token — not the master key — keeps the master key
+    // private and lets per-viewer revocation actually cut off segment access.
     let m3u8 = fs.readFileSync(file, 'utf8');
-    if (STREAM_KEY) m3u8 = m3u8.replace(/^([\w.-]+\.ts)\s*$/gm, `$1?k=${STREAM_KEY}`);
+    const vk = req.query.k || '';
+    if (vk) m3u8 = m3u8.replace(/^([\w.-]+\.ts)\s*$/gm, `$1?k=${encodeURIComponent(vk)}`);
     res.setHeader('Cache-Control', 'no-cache');
     res.type('application/vnd.apple.mpegurl');
     res.send(m3u8);
