@@ -37,7 +37,11 @@
       },
       "viewers":     { ".read": "auth != null", ".write": "auth != null" },
       "tokenHashes": { ".read": true, ".write": "auth != null" },
-      "streamBase":  { ".read": true, ".write": "auth != null" }
+      "streamBase":  { ".read": true, ".write": "auth != null" },
+      "deviceClaims": {
+        ".read": true,
+        "$hash": { ".write": "!data.exists() || auth != null" }
+      }
     },
 
     "stg": {

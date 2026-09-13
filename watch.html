@@ -97,14 +97,43 @@ const token=new URLSearchParams(location.search).get('t')||'';
 
 function showMsg(ic,title,sub){ $('mIc').textContent=ic; $('mT').textContent=title; $('mS').textContent=sub||''; show($('watch'),false); show($('req'),false); show($('msgBox'),true); }
 
-if(token){
-  // WATCH MODE
-  show($('watch'),true);
+async function sha256hex(str){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function deviceId(){
+  let d=null; try{ d=localStorage.getItem('cam-device'); }catch(_){}
+  if(!d){ const a=new Uint8Array(16); crypto.getRandomValues(a); d=[...a].map(x=>x.toString(16).padStart(2,'0')).join(''); try{ localStorage.setItem('cam-device', d); }catch(_){} }
+  return d;
+}
+function playFromBase(){
   db.ref('access/streamBase').once('value').then(s=>{
     const base=(s.val()||'').replace(/\/+$/,'');
     if(!base){ return showMsg('⚙️','Not set up yet','The camera link has not been configured. Check back soon.'); }
     startStream(base+'/live/stream.m3u8?k='+encodeURIComponent(token));
   }).catch(()=>{ startStreamFallback(); });
+}
+function showDeniedDevice(){
+  show($('watch'),false);
+  showMsg('📵','Link locked to another device','For security, this access link only works on the first device it was opened on. Please request access again from this device below.');
+  show($('req'),true);   // reveal the request form so they can re-request here
+}
+async function bindAndWatch(){
+  show($('watch'),true);
+  const dev=deviceId();
+  let hash=null; try{ hash=await sha256hex(token); }catch(_){}
+  if(hash){
+    try{
+      const ref=db.ref('access/deviceClaims/'+hash);
+      const snap=await ref.once('value'); const c=snap.val();
+      if(!c){ await ref.set({device:dev, ts:Date.now()}); }      // first device claims the link
+      else if(c.device!==dev){ return showDeniedDevice(); }        // different device → blocked
+    }catch(e){ /* if the claim check fails, still attempt to play */ }
+  }
+  playFromBase();
+}
+if(token){
+  bindAndWatch();
 }else{
   // REQUEST MODE
   show($('req'),true);
