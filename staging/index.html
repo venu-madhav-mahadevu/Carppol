@@ -2360,7 +2360,8 @@ function startCamStream(ov, url){
     const attach=()=>{
       try{
         if(video._hls) video._hls.destroy();
-        const h=new window.Hls({liveDurationInfinity:true, manifestLoadingMaxRetry:2, levelLoadingMaxRetry:2});
+        const h=new window.Hls({liveDurationInfinity:true, manifestLoadingMaxRetry:2, levelLoadingMaxRetry:2,
+          xhrSetup:function(xhr){ try{ xhr.setRequestHeader('ngrok-skip-browser-warning','true'); }catch(_){} }});
         h.loadSource(url); h.attachMedia(video);
         h.on(window.Hls.Events.MANIFEST_PARSED, ()=>video.play().catch(()=>{}));
         h.on(window.Hls.Events.ERROR, (_e,data)=>{
