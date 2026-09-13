@@ -108,9 +108,11 @@ function deviceId(){
 }
 function playFromBase(){
   db.ref('access/streamBase').once('value').then(s=>{
-    const base=(s.val()||'').replace(/\/+$/,'');
-    if(!base){ return showMsg('⚙️','Not set up yet','The camera link has not been configured. Check back soon.'); }
-    startStream(base+'/live/stream.m3u8?k='+encodeURIComponent(token));
+    let raw=(s.val()||'').trim(), origin='';
+    // accept either a bare base URL or a full stream URL — use only the origin (no path/key)
+    try{ origin=new URL(raw).origin; }catch(_){ origin=raw.replace(/\/live\b.*$/,'').replace(/\/+$/,''); }
+    if(!origin){ return showMsg('⚙️','Not set up yet','The camera link has not been configured. Check back soon.'); }
+    startStream(origin+'/live/stream.m3u8?k='+encodeURIComponent(token));
   }).catch(()=>{ startStreamFallback(); });
 }
 function showDeniedDevice(){

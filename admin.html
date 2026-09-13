@@ -255,8 +255,11 @@ async function sha256hex(str){
 }
 function randToken(){ const a=new Uint8Array(24); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,'0')).join(''); }
 function saveStreamBase(){
-  const base=document.getElementById('sBase').value.trim().replace(/\/+$/,'');
+  let raw=document.getElementById('sBase').value.trim(), base='';
+  // store ONLY the origin — never a path or ?k= key (this value is public)
+  try{ base=new URL(raw).origin; }catch(_){ base=raw.replace(/\/live\b.*$/,'').replace(/\/+$/,''); }
   const m=document.getElementById('bmsg'); m.className='msg'; m.textContent='Saving…';
+  document.getElementById('sBase').value=base;
   db.ref('access/streamBase').set(base)
     .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓'; })
     .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
