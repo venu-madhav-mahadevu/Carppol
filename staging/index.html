@@ -2266,6 +2266,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSwaps();});
     if(ok(w.afternoon)){ RECORD_WINDOWS.afternoon.start=w.afternoon.start; RECORD_WINDOWS.afternoon.end=w.afternoon.end; }
     if(ok(w.minDayAfternoon)){ RECORD_WINDOWS.minDayAfternoon.start=w.minDayAfternoon.start; RECORD_WINDOWS.minDayAfternoon.end=w.minDayAfternoon.end; }
     if(typeof updateCameraBanner==='function') updateCameraBanner();
+    if(typeof scheduleCamBoundary==='function') scheduleCamBoundary();   // times changed → re-time the auto-appear
     if(typeof autoTick==='function') autoTick();   // refresh any open live-record schedule text
   }, ()=>{});
 })();
@@ -2469,6 +2470,26 @@ function startCamStream(ov, url){
 setInterval(updateCameraBanner, 30000);
 document.addEventListener('DOMContentLoaded', updateCameraBanner);
 updateCameraBanner();
+// Fire an update EXACTLY at the next window start/end so the camera appears/disappears
+// on time automatically — no manual refresh needed (good for a wall display too).
+function nextCamBoundaryMs(){
+  const now=new Date();
+  const curMs = now.getHours()*3600000 + now.getMinutes()*60000 + now.getSeconds()*1000 + now.getMilliseconds();
+  const M=RECORD_WINDOWS.morning, A=todayAfternoon();
+  const bounds=[toMin(M.start),toMin(M.end),toMin(A.start),toMin(A.end)]
+    .map(m=>m*60000).filter(ms=>ms>curMs+300).sort((a,b)=>a-b);
+  if(bounds.length) return bounds[0]-curMs+500;          // next boundary today
+  return (24*3600000 - curMs) + 60000;                    // else just after midnight
+}
+let camBoundaryTimer=null;
+function scheduleCamBoundary(){
+  clearTimeout(camBoundaryTimer);
+  const wait=Math.max(1000, Math.min(nextCamBoundaryMs(), 6*3600000)); // cap so it re-checks ≤6h
+  camBoundaryTimer=setTimeout(()=>{ updateCameraBanner(); scheduleCamBoundary(); }, wait);
+}
+scheduleCamBoundary();
+// re-check when the tab becomes visible again (device woke / display returned)
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ updateCameraBanner(); scheduleCamBoundary(); } });
 
 // ---- Rebuild the whole calendar from data (used when the bell schedule changes) ----
 function rebuildCalendar(){
