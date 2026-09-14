@@ -592,6 +592,9 @@
   .cam-banner .cb-go{font:inherit;font-weight:800;font-size:12.5px;color:#1D4ED8;background:#fff;
     border-radius:20px;padding:7px 15px;flex:none;}
   @keyframes campulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.7);}70%{box-shadow:0 0 0 7px rgba(239,68,68,0);}100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}}
+  .cam-banner.info{background:linear-gradient(120deg,#475569,#334155);box-shadow:0 12px 30px -16px rgba(51,65,85,.55);cursor:default;}
+  .cam-banner.info .cb-ic::after{display:none;}
+  .cam-banner.info .cb-txt small{opacity:.9;}
   [hidden]{display:none!important;}
   .cam-modal{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;
     padding:18px;background:rgba(10,14,25,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}
@@ -2264,7 +2267,7 @@ function updateCameraBanner(){
       const mast=document.querySelector('.masthead');
       if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
       else document.querySelector('.wrap').prepend(b); }
-    b.href=url;
+    b.classList.remove('info'); b.href=url; b.target='_blank'; b.rel='noopener';
     const live = isHlsUrl(url);   // .m3u8 from the Ring bridge → live feed connected
     // Always open the modal (either the live feed, or the "Connect Ring" panel).
     b.onclick = (e=>{ e.preventDefault(); openCameraModal(url, win); });
@@ -2274,6 +2277,19 @@ function updateCameraBanner(){
       '<div class="cb-txt"><b>Live camera — '+label+'</b>'+demoNote+
       '<small>'+(live?'Tap to watch the live feed here':'Tap to connect your Ring camera')+'</small></div>'+
       '<span class="cb-go">'+(live?'▶ Watch live':'Connect Ring')+'</span>';
+    b.hidden=false;
+  } else if(signedIn){
+    // No live camera link set → show the camera TIMINGS as an info note so families know when it runs.
+    if(!b){ b=document.createElement('a'); b.id='camBanner'; b.className='cam-banner';
+      const mast=document.querySelector('.masthead');
+      if(mast&&mast.parentNode) mast.parentNode.insertBefore(b, mast.nextSibling);
+      else document.querySelector('.wrap').prepend(b); }
+    b.classList.add('info'); b.removeAttribute('href'); b.removeAttribute('target'); b.onclick=null;
+    const M=RECORD_WINDOWS.morning, A=todayAfternoon();
+    b.innerHTML='<span class="cb-ic">📹</span>'+
+      '<div class="cb-txt"><b>Live camera runs during carpool times</b>'+
+      '<small>Morning '+fmt12(M.start)+'–'+fmt12(M.end)+' · Afternoon '+fmt12(A.start)+'–'+fmt12(A.end)+
+      (isMinDayToday()?' <span style="opacity:.85">(min day today: '+fmt12(RECORD_WINDOWS.minDayAfternoon.start)+'–'+fmt12(RECORD_WINDOWS.minDayAfternoon.end)+')</span>':'')+'</small></div>';
     b.hidden=false;
   } else if(b){ b.hidden=true; }
 }
