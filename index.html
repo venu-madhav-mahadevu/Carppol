@@ -595,6 +595,7 @@
   .cam-banner.info{background:linear-gradient(120deg,#475569,#334155);box-shadow:0 12px 30px -16px rgba(51,65,85,.55);cursor:default;}
   .cam-banner.info .cb-ic::after{display:none;}
   .cam-banner.info .cb-txt small{opacity:.9;}
+  .cam-modal .cm-watch{font-size:12px;font-weight:700;color:#34d399;margin-left:6px;}
   [hidden]{display:none!important;}
   .cam-modal{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;
     padding:18px;background:rgba(10,14,25,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}
@@ -2309,9 +2310,10 @@ function updateCameraBanner(){
     b.onclick = (e=>{ e.preventDefault(); openCameraModal(url, win); });
     const label = win ? esc(win.label)+' carpool' : 'preview';
     const demoNote = (CAM_IS_STAGING && !CAMERA_URL) ? ' <small style="opacity:.8">(demo link — set yours in admin)</small>' : '';
+    const watchNote = (live && camWatchers>0) ? ' · <b>'+camWatchers+' watching</b>' : '';
     b.innerHTML='<span class="cb-ic">📹</span>'+
       '<div class="cb-txt"><b>Live camera — '+label+'</b>'+demoNote+
-      '<small>'+(live?'Tap to watch the live feed here':'Tap to connect your Ring camera')+'</small></div>'+
+      '<small>'+(live?('Tap to watch the live feed here'+watchNote):'Tap to connect your Ring camera')+'</small></div>'+
       '<span class="cb-go">'+(live?'▶ Watch live':'Connect Ring')+'</span>';
     b.hidden=false;
   } else if(signedIn){
@@ -2330,6 +2332,30 @@ function updateCameraBanner(){
   } else if(b){ b.hidden=true; }
 }
 function isHlsUrl(u){ return /\.m3u8(\?|#|$)/i.test(u||''); }
+// ---- Live "who's watching" presence (shared across calendar + external watch page) ----
+let camWatchers=0, camWatchRef=null, camWatchBeat=null;
+function camWatchStart(){
+  if(!fbOK||camWatchRef) return;
+  try{
+    camWatchRef=fbDb.ref('access/watching').push({ts:Date.now()});
+    camWatchRef.onDisconnect().remove();
+    camWatchBeat=setInterval(()=>{ if(camWatchRef) camWatchRef.set({ts:Date.now()}); }, 20000);
+  }catch(_){}
+}
+function camWatchStop(){
+  try{ if(camWatchBeat){clearInterval(camWatchBeat);camWatchBeat=null;} if(camWatchRef){camWatchRef.remove();camWatchRef=null;} }catch(_){}
+}
+function camWatchLabel(){ return camWatchers>0 ? ('👁 '+camWatchers+' watching now') : ''; }
+(function subCamWatchers(){
+  if(!fbOK) return;
+  fbDb.ref('access/watching').on('value', s=>{
+    const o=s.val()||{}, now=Date.now();
+    camWatchers=Object.values(o).filter(v=>v&&v.ts&&now-v.ts<45000).length;
+    const badge=document.getElementById('camWatchBadge'); if(badge) badge.textContent=camWatchLabel();
+    const b=document.getElementById('camBanner');
+    if(b && !b.hidden && !b.classList.contains('info')) updateCameraBanner();
+  }, ()=>{});
+})();
 // Camera modal: plays the live HLS feed when the bridge is connected, otherwise shows
 // a "Connect Ring" panel with the steps. The Ring key always lives on the bridge, never here.
 function openCameraModal(url, win){
@@ -2337,7 +2363,7 @@ function openCameraModal(url, win){
   if(!ov){
     ov=document.createElement('div'); ov.id='camModal'; ov.className='cam-modal';
     ov.innerHTML='<div class="cm-card"><button class="cm-x" type="button" aria-label="Close">×</button>'+
-      '<div class="cm-head">📹 <b class="cm-title">Live camera</b></div>'+
+      '<div class="cm-head">📹 <b class="cm-title">Live camera</b> <span class="cm-watch" id="camWatchBadge"></span></div>'+
       '<div class="cm-body"></div>'+
       '<div class="cm-note"></div></div>';
     document.body.appendChild(ov);
@@ -2396,7 +2422,9 @@ function startCamStream(ov, url){
   const showOffline =()=>{ if(loading) loading.hidden=true; if(offline) offline.hidden=false; };
   const hideOverlays=()=>{ if(loading) loading.hidden=true; if(offline) offline.hidden=true; };
   const armWatchdog =()=>{ clearTimeout(watchdog); watchdog=setTimeout(()=>{ if(!gotFrames) showOffline(); }, 14000); };
-  const cleanup =()=>{ clearTimeout(watchdog); try{ if(video._hls){video._hls.destroy(); video._hls=null;} }catch(_){} };
+  const cleanup =()=>{ clearTimeout(watchdog); camWatchStop(); try{ if(video._hls){video._hls.destroy(); video._hls=null;} }catch(_){} };
+  camWatchStart();   // count this viewer while the modal is open
+  const badge=ov.querySelector('#camWatchBadge'); if(badge) badge.textContent=camWatchLabel();
   // when real frames arrive, drop the overlay
   video.addEventListener('playing', ()=>{ gotFrames=true; hideOverlays(); });
   video.addEventListener('waiting', ()=>{ if(gotFrames && loading){ /* brief buffering, stay quiet */ } });

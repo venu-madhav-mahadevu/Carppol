@@ -51,7 +51,7 @@
         <button class="btn" style="max-width:200px" id="retry">↻ Reconnect</button>
       </div>
     </div>
-    <div class="center"><span class="pill live">● LIVE · ~6–10s delay</span></div>
+    <div class="center"><span class="pill live">● LIVE · ~6–10s delay</span> <span class="pill live" id="wCount" style="display:none"></span></div>
   </div>
 
   <!-- REQUEST (no token) -->
@@ -155,6 +155,23 @@ if(token){
 
 function startStreamFallback(){ showMsg('⚠️','Cannot load','Could not read the camera configuration.'); }
 
+// live "who's watching" presence (shared with the calendar)
+let wRef=null, wBeat=null;
+function watchPresenceStart(){
+  if(!db||wRef) return;
+  try{
+    wRef=db.ref('access/watching').push({ts:Date.now()});
+    wRef.onDisconnect().remove();
+    wBeat=setInterval(()=>{ if(wRef) wRef.set({ts:Date.now()}); }, 20000);
+    db.ref('access/watching').on('value', s=>{
+      const o=s.val()||{}, now=Date.now();
+      const n=Object.values(o).filter(v=>v&&v.ts&&now-v.ts<45000).length;
+      const el=$('wCount'); if(el){ el.textContent='👁 '+n+' watching'; el.style.display=n>0?'':'none'; }
+    });
+  }catch(_){}
+}
+window.addEventListener('pagehide', ()=>{ try{ if(wRef) wRef.remove(); }catch(_){} });
+
 function startStream(url){
   const v=$('vid'), load=$('ovLoad'), err=$('ovErr');
   let gotFrames=false, wd=null, hls=null;
@@ -162,7 +179,7 @@ function startStream(url){
   const showErr=(t,s)=>{ if(t)$('errT').textContent=t; if(s)$('errS').textContent=s; show(load,false); show(err,true); };
   const hideAll=()=>{ show(load,false); show(err,false); };
   const arm=()=>{ clearTimeout(wd); wd=setTimeout(()=>{ if(!gotFrames) showErr('Camera offline','The bridge may be off, or your access was revoked.'); },14000); };
-  v.addEventListener('playing',()=>{ gotFrames=true; hideAll(); });
+  v.addEventListener('playing',()=>{ gotFrames=true; hideAll(); watchPresenceStart(); });
   function go(){
     gotFrames=false; showLoad(); arm();
     if(v.canPlayType('application/vnd.apple.mpegurl')){ v.src=url; v.play().catch(()=>{}); v.onerror=()=>showErr(); return; }
