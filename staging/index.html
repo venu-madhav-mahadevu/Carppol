@@ -674,6 +674,15 @@
     100%{transform:translate3d(-16px,108vh,0) rotate(360deg);opacity:0;}
   }
   body.no-petals .petals{display:none;}
+  /* tappable flowers: pop when touched */
+  .petal{pointer-events:auto;cursor:pointer;touch-action:manipulation;}
+  .petal-pop{position:fixed;z-index:10060;pointer-events:none;display:flex;align-items:center;justify-content:center;
+    transform:translate(-50%,-50%) scale(.6);animation:petalPop .75s cubic-bezier(.2,.8,.3,1) forwards;}
+  .petal-pop.img{border-radius:50%;background-size:cover;background-position:center;box-shadow:0 14px 34px -10px rgba(0,0,0,.5);border:2px solid #fff;}
+  @keyframes petalPop{0%{transform:translate(-50%,-50%) scale(.6);opacity:0}25%{opacity:1}100%{transform:translate(-50%,-50%) scale(2.3);opacity:0}}
+  .petal-spark{position:fixed;z-index:10060;pointer-events:none;transform:translate(-50%,-50%);
+    animation:petalSpark .6s ease-out forwards;}
+  @keyframes petalSpark{0%{opacity:1;transform:translate(-50%,-50%) translate(0,0) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(.4)}}
 
   @media print{
     .toolbar,.banner,.petals{display:none;}
@@ -1150,6 +1159,33 @@ const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduc
 if(reduce) petalLevel=0;
 setPetalLevel(petalLevel);
 petalBtn.addEventListener('click',()=>{ petalLevel=(petalLevel+1)%PETAL_LEVELS.length; setPetalLevel(petalLevel); });
+// ---- Tap a falling flower → it pops (photos enlarge) ----
+function popPetal(p, x, y){
+  const pop=document.createElement('div'); pop.className='petal-pop';
+  if(p.classList.contains('petal-img')){
+    pop.classList.add('img'); pop.style.backgroundImage=p.style.backgroundImage;
+    pop.style.width='118px'; pop.style.height='118px';
+  }else{
+    pop.textContent=p.textContent||'🌸'; pop.style.fontSize='60px';
+  }
+  pop.style.left=x+'px'; pop.style.top=y+'px';
+  document.body.appendChild(pop);
+  pop.addEventListener('animationend',()=>pop.remove());
+  for(let i=0;i<5;i++){
+    const s=document.createElement('div'); s.className='petal-spark'; s.textContent='✨';
+    s.style.left=x+'px'; s.style.top=y+'px'; s.style.fontSize=(9+Math.random()*7).toFixed(0)+'px';
+    const a=Math.random()*6.283, d=26+Math.random()*34;
+    s.style.setProperty('--dx',(Math.cos(a)*d).toFixed(0)+'px');
+    s.style.setProperty('--dy',(Math.sin(a)*d).toFixed(0)+'px');
+    document.body.appendChild(s); s.addEventListener('animationend',()=>s.remove());
+  }
+  p.remove();                                   // burst the tapped flower
+  if(!document.body.classList.contains('no-petals')) makePetal(false);  // replenish one
+}
+petalBox.addEventListener('pointerdown', e=>{
+  const p=e.target.closest('.petal'); if(!p) return;
+  popPetal(p, e.clientX, e.clientY);
+});
 
 // ---- Side alerts (contextual toasts) ----
 const AC={venu:'#4F46E5',shiva:'#0D9488',charan:'#C2620A',kumar:'#DB2777',
