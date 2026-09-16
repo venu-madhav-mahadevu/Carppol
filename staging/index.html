@@ -640,6 +640,9 @@
   .cell .swap-ind{position:absolute;top:2px;left:3px;font-size:9px;font-weight:800;color:#fff;
     background:rgba(0,0,0,.28);border-radius:5px;padding:0 3px;line-height:1.35;}
   .cell.swapped{box-shadow:inset 0 0 0 2px rgba(255,255,255,.6);}
+  /* two-driver day: show BOTH colors (diagonal for full cover, left/right for half-day) */
+  .cell.school.split{background:linear-gradient(135deg,var(--c1) 0 48%, var(--c2) 52% 100%);}
+  .cell.school.split-lr{background:linear-gradient(90deg,var(--c1) 0 48%, var(--c2) 52% 100%);}
   .cell.selected{outline:3px solid var(--venu);outline-offset:2px;z-index:7;}
   .cell-swap{position:fixed;z-index:9998;display:flex;gap:6px;background:var(--card);
     border:1px solid var(--line);border-radius:12px;padding:6px;
@@ -908,7 +911,7 @@ function build(){
       const date=iso(y,m,d), wd=new Date(y,m,d).getDay();
       const cell=document.createElement('div');
       const inRange=date>=FIRST&&date<=LAST;
-      let cls='cell', who='', friTag=false, driver='', swapped=false;
+      let cls='cell', who='', friTag=false, driver='', swapped=false, origDriver='';
       if(!inRange){ cls+=(wd===0||wd===6)?' weekend':' blank'; }
       else if(wd===0||wd===6){ cls+=' weekend'; }
       else if(NO_SCHOOL[date]){ cls+=' holiday'; who=NO_SCHOOL[date]; }
@@ -916,18 +919,31 @@ function build(){
       else { driver=WEEK[wd]; }
       // covered-swap override: the covering driver takes this day
       if(driver && SWAP_OVERRIDES[date] && SWAP_OVERRIDES[date].name && PCLASS[SWAP_OVERRIDES[date].name]){
-        swapped=true; driver=SWAP_OVERRIDES[date].name;
+        swapped=true; origDriver=driver; driver=SWAP_OVERRIDES[date].name;
       }
+      const splitOK = swapped && origDriver && driver!==origDriver && PCLASS[origDriver] && SGRAD[PCLASS[origDriver]] && SGRAD[PCLASS[driver]];
+      const swapSlot = swapped ? (SWAP_OVERRIDES[date].slot||'Both') : '';
       if(driver){ cls+=' school '+(friTag?'friday ':'')+PCLASS[driver]; who=driver; }
       if(EARLY.has(date)) cls+=' early';
       if(swapped) cls+=' swapped';
+      if(splitOK) cls+=(swapSlot==='Both'?' split':' split-lr');   // show BOTH drivers' colors
       if(date===TODAY) cls+=' today';
       cell.className=cls;
       cell.dataset.date=date;
       if(driver) cell.dataset.person=driver;
+      if(splitOK){
+        const cO=SGRAD[PCLASS[origDriver]], cC=SGRAD[PCLASS[driver]];
+        // half-day: left=morning driver, right=afternoon driver
+        const c1 = (swapSlot==='Morning') ? cC : cO;   // Morning: cover drives AM (left)
+        const c2 = (swapSlot==='Morning') ? cO : (swapSlot==='Afternoon' ? cC : cC);
+        cell.style.setProperty('--c1', c1); cell.style.setProperty('--c2', c2);
+      }
       let extra=(date===TODAY?`<span class="today-car">🚗</span>`:'');
       if(swapped){ const ov=SWAP_OVERRIDES[date];
-        extra+=`<span class="swap-ind" title="Swap: ${esc(ov.from||'')} → ${esc(driver)} (${esc(ov.slot||'Both')})">⇄</span>`; }
+        const tip = swapSlot==='Both'
+          ? `${esc(ov.from||'')} → ${esc(driver)} (covering all day)`
+          : `${swapSlot}: ${esc(swapSlot==='Morning'?driver:ov.from||'')} · other half: ${esc(swapSlot==='Morning'?ov.from||'':driver)}`;
+        extra+=`<span class="swap-ind" title="${tip}">⇄</span>`; }
       cell.innerHTML=`<span class="num">${d}</span>`+(who?`<span class="who">${who}</span>`:'')+(friTag?`<span class="fri-flag">FRI</span>`:'')+extra;
       grid.appendChild(cell);
     }
@@ -2546,6 +2562,17 @@ function showSwapToast(s){
   document.body.appendChild(t);
   setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),400); }, 9000);
 }
+// notify the requester when their day gets covered/swapped
+function showCoveredToast(s){
+  const t=document.createElement('div'); t.className='swap-toast';
+  const line = s.oneWay
+    ? `<b>${esc(s.coverName)}</b> is covering your drive<br><span style="color:var(--sub)">${fmtDay(s.date)} — no swap needed 🤝</span>`
+    : `<b>${esc(s.coverName)}</b> swapped your drive<br><span style="color:var(--sub)">They take ${fmtDay(s.date)}${s.coverDate?` · you take ${fmtDay(s.coverDate)}`:''}</span>`;
+  t.innerHTML=`<span style="font-size:18px">✅</span><div>${line}</div>`;
+  t.addEventListener('click',()=>{ t.remove(); openSwaps(); });
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),400); }, 9000);
+}
 const swapReqOverlay=document.getElementById('swapReqOverlay');
 const swapReqModal=document.getElementById('swapReqModal');
 function closeSwapReq(){ swapReqOverlay.classList.remove('open'); }
@@ -2607,8 +2634,14 @@ function showSwapApprovePopup(s){
 }
 swapReqOverlay.addEventListener('click',e=>{ if(e.target===swapReqOverlay) closeSwapReq(); });
 function saveSwapSeen(){ try{localStorage.setItem('carpool-swap-seen',JSON.stringify([...swapSeen].slice(-200)));}catch(e){} }
-function handleSwapNotifs(openOthers, proposalsForMe){
-  proposalsForMe=proposalsForMe||[];
+function handleSwapNotifs(openOthers, proposalsForMe, coveredForMe){
+  proposalsForMe=proposalsForMe||[]; coveredForMe=coveredForMe||[];
+  // notify me when MY day gets covered/swapped (once per swap, persisted)
+  const freshCovered=coveredForMe.filter(s=>!swapSeen.has('C'+s.id));
+  if(freshCovered.length && !swapOverlay.classList.contains('open')){
+    freshCovered.slice(0,3).forEach(showCoveredToast);
+    freshCovered.forEach(s=>swapSeen.add('C'+s.id)); saveSwapSeen();
+  }
   const boardOpen=swapOverlay.classList.contains('open'), popupOpen=swapReqOverlay.classList.contains('open');
   if(!boardOpen && !popupOpen){
     if(swapFirstLoad){
@@ -2660,13 +2693,14 @@ function markSwapsSeen(){
       if(!swapOverrideRef){
         swapOverrideRef=dref('swaps');
         swapOverrideRef.on('value',snap=>{
-          const data=snap.val()||{}, next={}, today=localDateStr(Date.now()), openOthers=[], proposalsForMe=[];
+          const data=snap.val()||{}, next={}, today=localDateStr(Date.now()), openOthers=[], proposalsForMe=[], coveredForMe=[];
           const myUid=currentUser&&currentUser.uid;
           Object.entries(data).forEach(([id,v])=>{
             if(!v) return;
             if(v.status==='covered' && v.date && v.coverName){
               next[v.date]={name:v.coverName, from:v.byName||'', slot:v.slot||'Both'};
               if(v.coverDate && v.byName) next[v.coverDate]={name:v.byName, from:v.coverName, slot:'Both'};
+              if(v.by===myUid && v.date>=today){ coveredForMe.push({id, coverName:v.coverName, date:v.date, coverDate:v.coverDate||'', oneWay:!v.coverDate}); }
             }
             if((v.status||'open')==='open' && v.date>=today && v.by!==myUid){
               openOthers.push({id, byName:v.byName||'A driver', date:v.date, note:v.note||'', requestUser:v.requestUser||'', wantDate:v.wantDate||''});
@@ -2676,7 +2710,7 @@ function markSwapsSeen(){
             }
           });
           if(JSON.stringify(next)!==JSON.stringify(SWAP_OVERRIDES)){ SWAP_OVERRIDES=next; rebuildCalendar(); }
-          handleSwapNotifs(openOthers, proposalsForMe);
+          handleSwapNotifs(openOthers, proposalsForMe, coveredForMe);
         },()=>{});
       }
     }else{
