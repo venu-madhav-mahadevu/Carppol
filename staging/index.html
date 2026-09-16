@@ -643,6 +643,8 @@
   /* two-driver day: show BOTH colors (diagonal for full cover, left/right for half-day) */
   .cell.school.split{background:linear-gradient(135deg,var(--c1) 0 48%, var(--c2) 52% 100%);}
   .cell.school.split-lr{background:linear-gradient(90deg,var(--c1) 0 48%, var(--c2) 52% 100%);}
+  .cell .half-lbl{position:absolute;top:3px;font-size:8px;font-weight:800;letter-spacing:.4px;color:#fff;opacity:.92;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none;}
+  .cell .half-lbl.am{left:18px;} .cell .half-lbl.pm{right:6px;}
   .cell.selected{outline:3px solid var(--venu);outline-offset:2px;z-index:7;}
   .cell-swap{position:fixed;z-index:9998;display:flex;gap:6px;background:var(--card);
     border:1px solid var(--line);border-radius:12px;padding:6px;
@@ -943,7 +945,8 @@ function build(){
         const tip = swapSlot==='Both'
           ? `${esc(ov.from||'')} → ${esc(driver)} (covering all day)`
           : `${swapSlot}: ${esc(swapSlot==='Morning'?driver:ov.from||'')} · other half: ${esc(swapSlot==='Morning'?ov.from||'':driver)}`;
-        extra+=`<span class="swap-ind" title="${tip}">⇄</span>`; }
+        extra+=`<span class="swap-ind" title="${tip}">⇄</span>`;
+        if(splitOK && swapSlot!=='Both'){ extra+=`<span class="half-lbl am">AM</span><span class="half-lbl pm">PM</span>`; } }
       cell.innerHTML=`<span class="num">${d}</span>`+(who?`<span class="who">${who}</span>`:'')+(friTag?`<span class="fri-flag">FRI</span>`:'')+extra;
       grid.appendChild(cell);
     }
