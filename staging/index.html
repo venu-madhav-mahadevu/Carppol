@@ -517,6 +517,7 @@
   .swapcard .sc-act{flex:none;font:inherit;font-size:12px;font-weight:700;color:#fff;background:#22C55E;
     border:none;border-radius:20px;padding:6px 12px;cursor:pointer;}
   .swapcard .sc-act.cancel{background:var(--holiday);color:var(--kumar);}
+  .swapcard .sc-act.cover{background:#2563EB;}
   .swapcard .sc-tag{flex:none;font-size:11px;font-weight:700;color:#22C55E;}
   /* Stats bars */
   .sbar-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;}
@@ -2119,7 +2120,7 @@ function openSwaps(preDate){
   const today=localDateStr(Date.now());
   const sel=(typeof preDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(preDate)&&preDate>=today)?preDate:today;
   swapShell(
-    `<div class="msub">Can’t drive a day? Post the date + a note. Another driver picks one of <b>their</b> days to swap with you.</div>`+
+    `<div class="msub">Can’t drive a day (or half a day)? Post the date + a note. Another driver can <b>swap</b> one of their days — or just <b>🤝 cover</b> yours, no swap back needed.</div>`+
     `<div class="swap-form">`+
       `<label style="font-size:11px;font-weight:700;color:var(--sub)">Date you can’t drive</label>`+
       `<input class="finput" type="date" id="swDate" value="${sel}" min="${today}">`+
@@ -2179,6 +2180,14 @@ function acceptDirectSwap(r){
   dref('swaps/'+r.id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverDate:r.wantDate||null,coverTs:Date.now(),approvedTs:Date.now()})
     .catch(err=>alert('Could not accept: '+(err.message||'')));
 }
+// one-way COVER — take someone's day (or half-day) as a favor, nothing owed back
+function coverSwap(r){
+  const nm=(currentUser.displayName)||(currentUser.email||'Driver').split('@')[0];
+  const slot=(r.slot&&r.slot!=='Both')?r.slot.toLowerCase()+' ':'';
+  if(!confirm(`Cover ${r.byName}’s ${slot}drive on ${fmtDay(r.date)}?\nYou’ll drive it — no swap needed in return.`)) return;
+  dref('swaps/'+r.id).update({status:'covered',coverBy:currentUser.uid,coverName:nm,coverDate:null,oneWay:true,coverTs:Date.now(),approvedTs:Date.now()})
+    .catch(err=>alert('Could not cover: '+(err.message||'')));
+}
 function listenSwaps(){
   swapsRef=dref('swaps');
   swapsRef.on('value',snap=>{
@@ -2200,8 +2209,8 @@ function listenSwaps(){
       if(s==='open'){
         const directToMe = !mine && r.wantDate && r.requestUser && r.requestUser===(currentUser&&currentUser.displayName);
         if(mine) action=`<button class="sc-act cancel" data-cancel="${r.id}">Cancel</button>`;
-        else if(directToMe) action=`<button class="sc-act" data-accept="${r.id}">✓ Accept swap</button>`;
-        else action=`<button class="sc-act" data-swap="${r.id}">🔁 Swap a date</button>`;
+        else if(directToMe) action=`<span style="display:flex;gap:5px"><button class="sc-act" data-accept="${r.id}">✓ Accept</button><button class="sc-act cover" data-cover="${r.id}">🤝 Cover</button></span>`;
+        else action=`<span style="display:flex;gap:5px"><button class="sc-act" data-swap="${r.id}">🔁 Swap</button><button class="sc-act cover" data-cover="${r.id}">🤝 Cover</button></span>`;
         sub = directToMe
           ? `You take ${shortD(r.date)} · ${esc(r.byName)} takes your ${shortD(r.wantDate)}`
           : `${esc(r.slot||'Both')}${r.note?' · '+esc(r.note):''}${r.requestUser?` · asked ${esc(r.requestUser)}${r.wantDate?' for '+shortD(r.wantDate):''}`:''}`;
@@ -2211,7 +2220,7 @@ function listenSwaps(){
         sub = `${esc(r.coverName||'')} offers ${shortD(r.coverDate)} ↔ ${esc(r.byName||'')} ${shortD(r.date)}${mine?' — approve?':''}`;
       } else if(s==='covered'){
         action = `<span class="sc-tag">✅ done</span>`;
-        sub = `${esc(r.coverName||'')} takes ${shortD(r.date)}${r.coverDate?` · ${esc(r.byName||'')} takes ${shortD(r.coverDate)}`:''}`;
+        sub = `${esc(r.coverName||'')} takes ${shortD(r.date)}${r.coverDate?` · ${esc(r.byName||'')} takes ${shortD(r.coverDate)}`:` · 🤝 covering, no swap`}`;
       }
       return `<div class="swapcard ${cls}" style="--scg:${g}"><div class="sc-av">${esc((r.byName||'?')[0])}</div>`+
         `<div class="sc-info"><div class="sc-when">${esc(r.byName||'Driver')} · ${fmtDay(r.date)}</div>`+
@@ -2235,6 +2244,7 @@ function listenSwaps(){
     list.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approveSwap(b.dataset.approve)));
     list.querySelectorAll('[data-decline]').forEach(b=>b.addEventListener('click',()=>declineSwap(b.dataset.decline)));
     list.querySelectorAll('[data-accept]').forEach(b=>b.addEventListener('click',()=>{const r=rows.find(x=>x.id===b.dataset.accept); if(r) acceptDirectSwap(r);}));
+    list.querySelectorAll('[data-cover]').forEach(b=>b.addEventListener('click',()=>{const r=rows.find(x=>x.id===b.dataset.cover); if(r) coverSwap(r);}));
     list.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelSwap(b.dataset.cancel)));
   },err=>{const l=swapModal.querySelector('#swList');if(l)l.innerHTML=`<div class="where-empty">Couldn’t load swaps.<br>${esc(err.message||'')}</div>`;});
 }
