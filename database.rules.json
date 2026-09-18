@@ -26,6 +26,7 @@
       "$uid": { ".write": "auth != null && auth.uid === $uid" }
     },
     "kids":     { ".read": "auth != null", ".write": "auth != null" },
+    "helpers":  { ".read": "auth != null", ".write": "auth != null" },
     "swaps":    { ".read": "auth != null", ".write": "auth != null" },
     "messages": { ".read": "auth != null", ".write": "auth != null" },
     "secure":   { ".read": "auth != null", ".write": "auth != null" },
@@ -61,6 +62,7 @@
         "$uid": { ".write": "auth != null && auth.uid === $uid" }
       },
       "kids":     { ".read": "auth != null", ".write": "auth != null" },
+      "helpers":  { ".read": "auth != null", ".write": "auth != null" },
       "swaps":    { ".read": "auth != null", ".write": "auth != null" },
       "messages": { ".read": "auth != null", ".write": "auth != null" },
       "secure":   { ".read": "auth != null", ".write": "auth != null" }

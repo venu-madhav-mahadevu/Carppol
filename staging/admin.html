@@ -115,6 +115,10 @@ function render(){
     '<div style="display:flex;gap:8px;align-items:center"><input id="tmdS" type="time" style="flex:1"> <span>to</span> <input id="tmdE" type="time" style="flex:1"></div>'+
     '<button class="btn" id="saveTimes">Save times</button>'+
     '<div class="msg" id="tmsg"></div></div>'+
+    '<div class="card"><h2>🚗 Helper photos &amp; cars</h2>'+
+    '<div class="desc">Add each helper’s photo (shown on their days) plus their car photo and car number (shown in the day details). Visible to signed-in families only.</div>'+
+    '<div id="helperList"></div>'+
+    '<div class="msg" id="helpMsg"></div></div>'+
     '<div class="card"><h2>More settings</h2>'+
     '<div class="soon">Contacts, kids, drivers and rotation editors are coming next.</div></div>';
   document.getElementById('outBtn').onclick=()=>auth.signOut();
@@ -139,6 +143,62 @@ function render(){
     set('taS', a.start||'13:40'); set('taE', a.end||'15:00');
     set('tmdS', d.start||'12:00'); set('tmdE', d.end||'13:00');
   }).catch(()=>{});
+  renderHelpers();
+}
+// ---- Helper photos + car photo + car number ----
+const HELPER_NAMES=['Venu','Shiva','Charan','Kumar'];
+function renderHelpers(){
+  const box=document.getElementById('helperList'); if(!box) return;
+  box.innerHTML=HELPER_NAMES.map(n=>
+    '<div class="hrow" data-h="'+n+'" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span class="hav" style="width:44px;height:44px;border-radius:50%;background:#e5e7eb;background-size:cover;background-position:center;display:inline-block;flex:none"></span>'+
+        '<b style="flex:1">'+n+'</b>'+
+        '<button class="btn sec" style="width:auto;padding:6px 10px" data-photo="'+n+'">📷 Photo</button>'+
+        '<button class="btn sec" style="width:auto;padding:6px 10px" data-car="'+n+'">🚗 Car</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
+        '<input class="hcarnum" placeholder="Car number (e.g. 7ABC123)" style="flex:1" value="">'+
+        '<button class="btn" style="width:auto;padding:7px 12px" data-save="'+n+'">Save</button>'+
+      '</div>'+
+      '<img class="hcarimg" style="display:none;width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px">'+
+    '</div>').join('');
+  HELPER_NAMES.forEach(n=>{
+    dref('helpers/'+n).once('value').then(s=>{ const v=s.val()||{}; const row=box.querySelector('.hrow[data-h="'+n+'"]'); if(!row) return;
+      if(v.photo) row.querySelector('.hav').style.backgroundImage="url('"+v.photo+"')";
+      if(v.carNumber) row.querySelector('.hcarnum').value=v.carNumber;
+      if(v.carPhoto){ const im=row.querySelector('.hcarimg'); im.src=v.carPhoto; im.style.display=''; }
+    }).catch(()=>{});
+  });
+  box.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>pickHelperImg(b.dataset.photo,'photo',320));
+  box.querySelectorAll('[data-car]').forEach(b=>b.onclick=()=>pickHelperImg(b.dataset.car,'carPhoto',700));
+  box.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{
+    const n=b.dataset.save, row=box.querySelector('.hrow[data-h="'+n+'"]');
+    const num=row.querySelector('.hcarnum').value.trim();
+    const m=document.getElementById('helpMsg'); m.className='msg'; m.textContent='Saving '+n+'…';
+    dref('helpers/'+n).update({carNumber:num, by:user.uid, ts:Date.now()})
+      .then(()=>{ m.className='msg ok'; m.textContent=n+' saved ✓'; })
+      .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+  });
+}
+function pickHelperImg(name, field, maxpx){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  inp.onchange=ev=>{ const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+    const m=document.getElementById('helpMsg'); m.className='msg'; m.textContent='Uploading…';
+    const rd=new FileReader();
+    rd.onload=()=>{ const img=new Image(); img.onload=()=>{
+      let w=img.width,h=img.height; const s=Math.min(maxpx/w,maxpx/h,1);
+      const cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
+      const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+      cv.getContext('2d').drawImage(img,0,0,cw,ch);
+      const uri=cv.toDataURL('image/jpeg',0.82);
+      dref('helpers/'+name).update({[field]:uri, by:user.uid, ts:Date.now()})
+        .then(()=>{ m.className='msg ok'; m.textContent=name+' image saved ✓'; renderHelpers(); })
+        .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+    }; img.onerror=()=>{ m.className='msg err'; m.textContent='That image could not be read.'; }; img.src=rd.result; };
+    rd.readAsDataURL(f);
+  };
+  inp.click();
 }
 function saveTimes(){
   const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
