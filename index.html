@@ -963,6 +963,20 @@ function driverForDate(dateStr){
   const cell=document.querySelector(`.cell[data-date="${dateStr}"]`);
   return cell&&cell.dataset.person?cell.dataset.person:null;
 }
+// Morning + afternoon drivers for a day (they differ on a half-day swap/cover)
+function driversForDate(dateStr){
+  const cell=document.querySelector(`.cell[data-date="${dateStr}"]`);
+  if(!cell||!cell.dataset.person) return null;
+  const ov=SWAP_OVERRIDES[dateStr];
+  if(ov && ov.name && ov.from && ov.name!==ov.from){
+    const slot=ov.slot||'Both';
+    if(slot==='Morning')   return {morning:ov.name, afternoon:ov.from, split:true};
+    if(slot==='Afternoon') return {morning:ov.from, afternoon:ov.name, split:true};
+    return {morning:ov.name, afternoon:ov.name, split:false};   // Both = one driver all day
+  }
+  const p=cell.dataset.person;
+  return {morning:p, afternoon:p, split:false};
+}
 function addDays(dateStr,n){
   const [y,m,d]=dateStr.split('-').map(Number);
   const dt=new Date(y,m-1,d+n);
@@ -987,7 +1001,10 @@ function buildBanner(){
   let main,label,next='';
   if(todayDriver){
     label='Driving today';
-    main=`<b>${todayDriver}</b> is on carpool today`;
+    const dd=driversForDate(TODAY);
+    main = (dd && dd.split)
+      ? `🌅 <b>${dd.morning}</b> AM · 🌆 <b>${dd.afternoon}</b> PM`
+      : `<b>${todayDriver}</b> is on carpool today`;
     if(nextDriver){
       const nd=new Date(...nextDate.split('-').map((v,i)=>i===1?v-1:+v));
       next=`Next: ${nextDriver} · ${nd.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}`;
@@ -1236,9 +1253,16 @@ function collectAlerts(){
   const td=inRange(TODAY)?driverForDate(TODAY):null;
   if(td){
     const early=EARLY.has(TODAY);
-    list.push({icon:'🚗',color:AC[PCLASS[td]],date:fmtDay(TODAY),when:'Today',
-      title:`${td} drives today`,
-      text:early?'Leave 7:30 AM · early pickup 12:45 PM':'Leave 7:30 AM · pickup 2:00 PM'});
+    const dd=driversForDate(TODAY);
+    if(dd && dd.split){
+      list.push({icon:'🔀',color:AC[PCLASS[dd.morning]]||AC.info,date:fmtDay(TODAY),when:'Today',
+        title:'Two drivers today',
+        text:`🌅 ${dd.morning} drops (AM) · 🌆 ${dd.afternoon} picks up (PM)${early?' · early pickup 12:45 PM':''}`});
+    }else{
+      list.push({icon:'🚗',color:AC[PCLASS[td]],date:fmtDay(TODAY),when:'Today',
+        title:`${td} drives today`,
+        text:early?'Leave 7:30 AM · early pickup 12:45 PM':'Leave 7:30 AM · pickup 2:00 PM'});
+    }
   }else{
     let scan=TODAY<FIRST?FIRST:addDays(TODAY,1),nd=null;
     for(let i=0;i<200&&scan<=LAST;i++){if(driverForDate(scan)){nd=scan;break;}scan=addDays(scan,1);}
@@ -1250,8 +1274,15 @@ function collectAlerts(){
   if(inRange(tmr)){
     const dt=driverForDate(tmr);
     if(dt){const e=EARLY.has(tmr);
-      list.push({icon:'➡️',color:AC[PCLASS[dt]],date:fmtDay(tmr),when:'Tomorrow',
-        title:`${dt} drives tomorrow`,text:e?'Minimum day · pickup 12:45 PM':'Pickup 2:00 PM'});}
+      const dd=driversForDate(tmr);
+      if(dd && dd.split){
+        list.push({icon:'🔀',color:AC[PCLASS[dd.morning]]||AC.info,date:fmtDay(tmr),when:'Tomorrow',
+          title:'Two drivers tomorrow',
+          text:`🌅 ${dd.morning} drops (AM) · 🌆 ${dd.afternoon} picks up (PM)${e?' · pickup 12:45 PM':''}`});
+      }else{
+        list.push({icon:'➡️',color:AC[PCLASS[dt]],date:fmtDay(tmr),when:'Tomorrow',
+          title:`${dt} drives tomorrow`,text:e?'Minimum day · pickup 12:45 PM':'Pickup 2:00 PM'});}
+    }
   }
   // 2b) Upcoming birthdays (within 30 days)
   Object.keys(BIRTHDAYS).forEach(nm=>{
@@ -2100,7 +2131,9 @@ function openDay(date){
   const noSchool=NO_SCHOOL[date];
   const early=EARLY.has(date);
   let note='';
+  const dd=driversForDate(date);
   if(noSchool) note=`🏖️ <b>No school</b> — ${esc(noSchool)}`;
+  else if(dd && dd.split) note=`🔀 <b>Dual carpool</b> — 🌅 ${esc(dd.morning)} drops (AM) · 🌆 ${esc(dd.afternoon)} picks up (PM)${early?' · ⏰ minimum day, pickup 12:45 PM':''}`;
   else if(driver) note=`🚗 <b>${esc(driver)}</b> drives${early?' · ⏰ minimum day, pickup 12:45 PM':' · pickup 2:00 PM'}`;
   else note='Weekend / no carpool';
   const evHtml = events.length
