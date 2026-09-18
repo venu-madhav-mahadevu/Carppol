@@ -151,11 +151,11 @@ function renderHelpers(){
   const box=document.getElementById('helperList'); if(!box) return;
   box.innerHTML=HELPER_NAMES.map(n=>
     '<div class="hrow" data-h="'+n+'" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
-      '<div style="display:flex;align-items:center;gap:10px">'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
         '<span class="hav" style="width:44px;height:44px;border-radius:50%;background:#e5e7eb;background-size:cover;background-position:center;display:inline-block;flex:none"></span>'+
-        '<b style="flex:1">'+n+'</b>'+
-        '<button class="btn sec" style="width:auto;padding:6px 10px" data-photo="'+n+'">📷 Photo</button>'+
-        '<button class="btn sec" style="width:auto;padding:6px 10px" data-car="'+n+'">🚗 Car</button>'+
+        '<b style="flex:1;min-width:80px">'+n+'</b>'+
+        '<button class="btn sec" style="width:auto;padding:6px 10px;flex:none" data-photo="'+n+'">📷 Photo</button>'+
+        '<button class="btn sec" style="width:auto;padding:6px 10px;flex:none" data-car="'+n+'">🚗 Car</button>'+
       '</div>'+
       '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
         '<input class="hcarnum" placeholder="Car number (e.g. 7ABC123)" style="flex:1" value="">'+
