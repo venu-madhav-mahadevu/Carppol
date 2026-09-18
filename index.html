@@ -645,6 +645,22 @@
   .cell.school.split-lr{background:linear-gradient(90deg,var(--c1) 0 48%, var(--c2) 52% 100%);}
   .cell .half-lbl{position:absolute;top:3px;font-size:8px;font-weight:800;letter-spacing:.4px;color:#fff;opacity:.92;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none;}
   .cell .half-lbl.am{left:18px;} .cell .half-lbl.pm{right:6px;}
+  /* helper photos on a day */
+  .cell .hlp-av{width:36px;height:36px;border-radius:50%;background-size:cover;background-position:center;
+    border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:800;font-size:15px;margin:2px auto 3px;}
+  .cell .hlp-avs{display:flex;gap:4px;justify-content:center;margin:2px 0 3px;}
+  .cell .hlp-avs .hlp-av{width:30px;height:30px;margin:0;font-size:13px;}
+  /* day-detail: driver + car card */
+  .hd-card{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0;background:var(--card);}
+  .hd-top{display:flex;align-items:center;gap:11px;}
+  .hd-av{width:44px;height:44px;border-radius:50%;background-size:cover;background-position:center;flex:none;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;}
+  .hd-meta{display:flex;flex-direction:column;gap:2px;font-size:14px;}
+  .hd-slot{font-size:11.5px;color:var(--sub);font-weight:600;}
+  .hd-plate{display:inline-block;margin-top:3px;font-size:13px;font-weight:800;letter-spacing:.5px;
+    background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:2px 8px;width:max-content;}
+  .hd-car{width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin-top:9px;display:block;}
   .cell.selected{outline:3px solid var(--venu);outline-offset:2px;z-index:7;}
   .cell-swap{position:fixed;z-index:9998;display:flex;gap:6px;background:var(--card);
     border:1px solid var(--line);border-radius:12px;padding:6px;
@@ -805,6 +821,7 @@
 <script>
 const WEEK = {1:'Venu',2:'Shiva',3:'Charan',4:'Kumar'};
 const PCLASS = {'Venu':'venu','Shiva':'shiva','Charan':'charan','Kumar':'kumar'};
+let HELPERS = {};   // {name:{photo, carPhoto, carNumber}} — private, only when signed in
 
 /* ===== EDIT HERE: driver phone numbers (country code + number, digits only) =====
    Example for a US number 510-555-0123  ->  '15105550123'                     */
@@ -947,7 +964,21 @@ function build(){
           : `${swapSlot}: ${esc(swapSlot==='Morning'?driver:ov.from||'')} · other half: ${esc(swapSlot==='Morning'?ov.from||'':driver)}`;
         extra+=`<span class="swap-ind" title="${tip}">⇄</span>`;
         if(splitOK && swapSlot!=='Both'){ extra+=`<span class="half-lbl am">AM</span><span class="half-lbl pm">PM</span>`; } }
-      cell.innerHTML=`<span class="num">${d}</span>`+(who?`<span class="who">${who}</span>`:'')+(friTag?`<span class="fri-flag">FRI</span>`:'')+extra;
+      // helper photos on the day (instead of relying only on colors)
+      let avHtml='';
+      if(driver){
+        const ph=n=>HELPERS[n]&&HELPERS[n].photo;
+        const avEl=n=>{ const p=ph(n); return p
+          ? `<span class="hlp-av" style="background-image:url('${p}')" title="${esc(n)}"></span>`
+          : `<span class="hlp-av noimg" style="background:${SGRAD[PCLASS[n]]||'#64748B'}" title="${esc(n)}">${esc((n||'?')[0])}</span>`; };
+        if(splitOK){
+          const mName=(swapSlot==='Morning')?driver:origDriver, aName=(swapSlot==='Morning')?origDriver:driver;
+          if(ph(mName)||ph(aName)) avHtml=`<span class="hlp-avs">${avEl(mName)}${avEl(aName)}</span>`;
+        } else if(ph(driver)){
+          avHtml=avEl(driver);
+        }
+      }
+      cell.innerHTML=`<span class="num">${d}</span>`+avHtml+(who?`<span class="who">${who}</span>`:'')+(friTag?`<span class="fri-flag">FRI</span>`:'')+extra;
       grid.appendChild(cell);
     }
     month.appendChild(grid);cal.appendChild(month);
@@ -2139,8 +2170,25 @@ function openDay(date){
   const evHtml = events.length
     ? `<div class="day-sec">🏫 School events</div>`+events.map(e=>`<div class="dayrow"><span class="de-ic">📌</span><span class="de-t">${esc(e.t||e)}</span></div>`).join('')
     : `<div class="day-sec">🏫 School events</div><div class="day-note">No school events on this day.</div>`;
+  // driver(s) + car photo + car number (signed-in families only)
+  let carHtml='';
+  if(driver && dd && fbOK && currentUser){
+    const names = dd.split ? [{n:dd.morning,slot:'🌅 Morning · drop'},{n:dd.afternoon,slot:'🌆 Afternoon · pickup'}] : [{n:driver,slot:''}];
+    const hasAny = names.some(x=>{const h=HELPERS[x.n]||{}; return h.photo||h.carPhoto||h.carNumber;});
+    if(hasAny){
+      const cardFor=(n,slot)=>{
+        const h=HELPERS[n]||{};
+        const av=h.photo?`<span class="hd-av" style="background-image:url('${h.photo}')"></span>`
+          :`<span class="hd-av noimg" style="background:${SGRAD[PCLASS[n]]||'#64748B'}">${esc((n||'?')[0])}</span>`;
+        const car=h.carPhoto?`<img class="hd-car" src="${h.carPhoto}" alt="car">`:'';
+        const plate=h.carNumber?`<span class="hd-plate">🚘 ${esc(h.carNumber)}</span>`:'';
+        return `<div class="hd-card"><div class="hd-top">${av}<div class="hd-meta"><b>${esc(n)}</b>${slot?`<span class="hd-slot">${slot}</span>`:''}${plate}</div></div>${car}</div>`;
+      };
+      carHtml=`<div class="day-sec">🚗 Driver${dd.split?'s':''} &amp; car</div>`+names.map(x=>cardFor(x.n,x.slot)).join('');
+    }
+  }
   const isMyDay = driver && fbOK && currentUser && currentUser.displayName===driver && date>=TODAY;
-  const inner=`<div class="day-note">${note}</div>`+evHtml+
+  const inner=`<div class="day-note">${note}</div>`+carHtml+evHtml+
     (isMyDay?`<button class="mbtn live" id="daySwap">🔁 Request a swap for this day</button>`:'')+
     `<button class="mbtn maps" id="dayTimes">🕐 Carpool timings for this day</button>`;
   UI.openModal('dayOverlay', inner, '📅 '+fmtDay(date));
@@ -3082,6 +3130,20 @@ function onKidPhotoPick(name,ev,btn){
       .catch(err=>{if(btn)btn.textContent='📷';alert('Could not save photo: '+(err.message||''));});
   };img.onerror=()=>{if(btn)btn.textContent='📷';alert('That image could not be read.');};img.src=rd.result;};
   rd.readAsDataURL(file);
+}
+let helpersRef=null;
+if(fbOK){
+  fbAuth.onAuthStateChanged(u=>{
+    if(u){
+      if(!helpersRef){
+        helpersRef=dref('helpers');
+        helpersRef.on('value',snap=>{ HELPERS=snap.val()||{}; rebuildCalendar(); }, ()=>{});
+      }
+    }else{
+      if(helpersRef){ helpersRef.off(); helpersRef=null; }
+      if(Object.keys(HELPERS).length){ HELPERS={}; rebuildCalendar(); }
+    }
+  });
 }
 let kidsRef=null;
 if(fbOK){

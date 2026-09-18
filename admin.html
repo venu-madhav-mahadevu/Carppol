@@ -115,23 +115,15 @@ function render(){
     '<div style="display:flex;gap:8px;align-items:center"><input id="tmdS" type="time" style="flex:1"> <span>to</span> <input id="tmdE" type="time" style="flex:1"></div>'+
     '<button class="btn" id="saveTimes">Save times</button>'+
     '<div class="msg" id="tmsg"></div></div>'+
-    '<div class="card"><h2>👁️ External viewers (approval)</h2>'+
-    '<div class="desc">People who request access on your <b>watch page</b> (<code>watch.html</code>) appear here. Approve to create their private link; revoke anytime and their link stops working.</div>'+
-    '<label>Camera stream address <span style="font-weight:400;opacity:.7">(the https://… base of your bridge/tunnel — no /live)</span></label>'+
-    '<input id="sBase" type="url" placeholder="https://xxxx.trycloudflare.com">'+
-    '<button class="btn" id="saveBase">Save stream address</button>'+
-    '<div class="msg" id="bmsg"></div>'+
-    '<h3 style="margin:18px 0 6px;font-size:14px">Pending requests</h3><div id="reqList" class="desc">Loading…</div>'+
-    '<h3 style="margin:18px 0 6px;font-size:14px">Approved viewers</h3><div id="viewerList" class="desc">Loading…</div>'+
-    '<div class="msg" id="vmsg"></div></div>'+
+    '<div class="card"><h2>🚗 Helper photos &amp; cars</h2>'+
+    '<div class="desc">Add each helper’s photo (shown on their days) plus their car photo and car number (shown in the day details). Visible to signed-in families only.</div>'+
+    '<div id="helperList"></div>'+
+    '<div class="msg" id="helpMsg"></div></div>'+
     '<div class="card"><h2>More settings</h2>'+
     '<div class="soon">Contacts, kids, drivers and rotation editors are coming next.</div></div>';
   document.getElementById('outBtn').onclick=()=>auth.signOut();
   document.getElementById('saveHeader').onclick=saveHeader;
   document.getElementById('saveTimes').onclick=saveTimes;
-  document.getElementById('saveBase').onclick=saveStreamBase;
-  db.ref('access/streamBase').once('value').then(s=>{ const el=document.getElementById('sBase'); if(el) el.value=s.val()||''; }).catch(()=>{});
-  listenAccess();
   document.getElementById('dlTemplate').onclick=downloadTemplate;
   document.getElementById('schedFile').onchange=onSchedFile;
   document.getElementById('saveSched').onclick=saveSchedule;
@@ -151,6 +143,62 @@ function render(){
     set('taS', a.start||'13:40'); set('taE', a.end||'15:00');
     set('tmdS', d.start||'12:00'); set('tmdE', d.end||'13:00');
   }).catch(()=>{});
+  renderHelpers();
+}
+// ---- Helper photos + car photo + car number ----
+const HELPER_NAMES=['Venu','Shiva','Charan','Kumar'];
+function renderHelpers(){
+  const box=document.getElementById('helperList'); if(!box) return;
+  box.innerHTML=HELPER_NAMES.map(n=>
+    '<div class="hrow" data-h="'+n+'" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span class="hav" style="width:44px;height:44px;border-radius:50%;background:#e5e7eb;background-size:cover;background-position:center;display:inline-block;flex:none"></span>'+
+        '<b style="flex:1">'+n+'</b>'+
+        '<button class="btn sec" style="width:auto;padding:6px 10px" data-photo="'+n+'">📷 Photo</button>'+
+        '<button class="btn sec" style="width:auto;padding:6px 10px" data-car="'+n+'">🚗 Car</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
+        '<input class="hcarnum" placeholder="Car number (e.g. 7ABC123)" style="flex:1" value="">'+
+        '<button class="btn" style="width:auto;padding:7px 12px" data-save="'+n+'">Save</button>'+
+      '</div>'+
+      '<img class="hcarimg" style="display:none;width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px">'+
+    '</div>').join('');
+  HELPER_NAMES.forEach(n=>{
+    dref('helpers/'+n).once('value').then(s=>{ const v=s.val()||{}; const row=box.querySelector('.hrow[data-h="'+n+'"]'); if(!row) return;
+      if(v.photo) row.querySelector('.hav').style.backgroundImage="url('"+v.photo+"')";
+      if(v.carNumber) row.querySelector('.hcarnum').value=v.carNumber;
+      if(v.carPhoto){ const im=row.querySelector('.hcarimg'); im.src=v.carPhoto; im.style.display=''; }
+    }).catch(()=>{});
+  });
+  box.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>pickHelperImg(b.dataset.photo,'photo',320));
+  box.querySelectorAll('[data-car]').forEach(b=>b.onclick=()=>pickHelperImg(b.dataset.car,'carPhoto',700));
+  box.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{
+    const n=b.dataset.save, row=box.querySelector('.hrow[data-h="'+n+'"]');
+    const num=row.querySelector('.hcarnum').value.trim();
+    const m=document.getElementById('helpMsg'); m.className='msg'; m.textContent='Saving '+n+'…';
+    dref('helpers/'+n).update({carNumber:num, by:user.uid, ts:Date.now()})
+      .then(()=>{ m.className='msg ok'; m.textContent=n+' saved ✓'; })
+      .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+  });
+}
+function pickHelperImg(name, field, maxpx){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  inp.onchange=ev=>{ const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+    const m=document.getElementById('helpMsg'); m.className='msg'; m.textContent='Uploading…';
+    const rd=new FileReader();
+    rd.onload=()=>{ const img=new Image(); img.onload=()=>{
+      let w=img.width,h=img.height; const s=Math.min(maxpx/w,maxpx/h,1);
+      const cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
+      const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+      cv.getContext('2d').drawImage(img,0,0,cw,ch);
+      const uri=cv.toDataURL('image/jpeg',0.82);
+      dref('helpers/'+name).update({[field]:uri, by:user.uid, ts:Date.now()})
+        .then(()=>{ m.className='msg ok'; m.textContent=name+' image saved ✓'; renderHelpers(); })
+        .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
+    }; img.onerror=()=>{ m.className='msg err'; m.textContent='That image could not be read.'; }; img.src=rd.result; };
+    rd.readAsDataURL(f);
+  };
+  inp.click();
 }
 function saveTimes(){
   const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
@@ -245,91 +293,6 @@ function saveSchedule(){
   Promise.all([ dref('config/schedule').set(sched), dref('config/events').set(events) ])
     .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓  calendar rebuilt · '+Object.keys(events).length+' days with school events.'; })
     .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
-}
-// ===== External viewers: approval + revocation =====
-const WATCH_BASE = location.origin + '/Carppol/watch.html';
-function esc2(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-async function sha256hex(str){
-  const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-function randToken(){ const a=new Uint8Array(24); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,'0')).join(''); }
-function saveStreamBase(){
-  let raw=document.getElementById('sBase').value.trim(), base='';
-  // store ONLY the origin — never a path or ?k= key (this value is public)
-  try{ base=new URL(raw).origin; }catch(_){ base=raw.replace(/\/live\b.*$/,'').replace(/\/+$/,''); }
-  const m=document.getElementById('bmsg'); m.className='msg'; m.textContent='Saving…';
-  document.getElementById('sBase').value=base;
-  db.ref('access/streamBase').set(base)
-    .then(()=>{ m.className='msg ok'; m.textContent='Saved ✓'; })
-    .catch(e=>{ m.className='msg err'; m.textContent='Could not save: '+(e.message||''); });
-}
-function listenAccess(){
-  db.ref('access/requests').on('value', snap=>{
-    const o=snap.val()||{}; const rows=Object.entries(o).filter(([,v])=>v&&(v.status||'pending')==='pending');
-    const el=document.getElementById('reqList'); if(!el) return;
-    if(!rows.length){ el.textContent='No pending requests.'; return; }
-    el.innerHTML=rows.map(([id,v])=>
-      '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
-        '<b>'+esc2(v.name||(v.first+' '+v.last))+'</b><br>'+
-        '<span style="color:#6b7280;font-size:12.5px">📞 '+esc2(v.phone||'—')+' · 🏠 House '+esc2(v.house||'—')+'</span><br>'+
-        '<button class="btn" style="width:auto;padding:7px 13px;margin-top:8px" data-ap="'+id+'">Approve</button> '+
-        '<button class="btn sec" style="width:auto;padding:7px 13px;margin-top:8px;color:#b91c1c" data-dn="'+id+'">Deny &amp; delete</button>'+
-      '</div>').join('');
-    el.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>approveRequest(b.dataset.ap, o[b.dataset.ap]));
-    el.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>denyRequest(b.dataset.dn));
-  });
-  db.ref('access/viewers').on('value', snap=>{
-    const o=snap.val()||{}; const rows=Object.entries(o).filter(([,v])=>v);
-    const el=document.getElementById('viewerList'); if(!el) return;
-    if(!rows.length){ el.textContent='No viewers yet.'; return; }
-    el.innerHTML=rows.map(([id,v])=>{
-      const link=esc2(WATCH_BASE+'?t='+v.token);
-      const active=!!v.active;
-      const badge=active?'<span style="color:#059669;font-weight:700">● Active</span>':'<span style="color:#b91c1c;font-weight:700">● Revoked</span>';
-      return '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:8px 0">'+
-        '<b>'+esc2(v.name)+'</b> <span style="color:#6b7280;font-size:12px">🏠 '+esc2(v.house||'—')+'</span> · '+badge+'<br>'+
-        (active?'<input readonly value="'+link+'" style="font-size:11.5px;margin:6px 0" onclick="this.select()">':'')+
-        (active?'<button class="btn sec" style="width:auto;padding:6px 12px" data-cp="'+link+'">Copy link</button> ':'')+
-        (active?'<button class="btn sec" style="width:auto;padding:6px 12px;color:#b45309" data-rv="'+id+'" data-hash="'+esc2(v.hash)+'">Revoke</button> ':'')+
-        '<button class="btn sec" style="width:auto;padding:6px 12px;color:#b91c1c" data-del="'+id+'" data-hash="'+esc2(v.hash)+'">🗑 Delete</button>'+
-      '</div>';
-    }).join('');
-    el.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{ navigator.clipboard.writeText(b.dataset.cp); b.textContent='Copied ✓'; });
-    el.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>revokeViewer(b.dataset.rv, b.dataset.hash));
-    el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteViewer(b.dataset.del, b.dataset.hash));
-  });
-}
-async function approveRequest(id, v){
-  const m=document.getElementById('vmsg'); m.className='msg'; m.textContent='Approving…';
-  try{
-    const token=randToken(); const hash=await sha256hex(token);
-    await db.ref('access/viewers/'+id).set({ name:v.name||((v.first||'')+' '+(v.last||'')).trim(), phone:v.phone||'', house:v.house||'', token, hash, active:true, ts:Date.now() });
-    await db.ref('access/tokenHashes/'+hash).set(true);
-    await db.ref('access/requests/'+id+'/status').set('approved');
-    m.className='msg ok'; m.textContent='Approved ✓ — private link created (copy it below and send to them).';
-  }catch(e){ m.className='msg err'; m.textContent='Could not approve: '+(e.message||''); }
-}
-function denyRequest(id){
-  if(!confirm('Delete this request?')) return;
-  db.ref('access/requests/'+id).remove().catch(()=>{});
-}
-function revokeViewer(id, hash){
-  const m=document.getElementById('vmsg'); m.className='msg'; m.textContent='Revoking…';
-  Promise.all([ db.ref('access/viewers/'+id+'/active').set(false), db.ref('access/tokenHashes/'+hash).remove() ])
-    .then(()=>{ m.className='msg ok'; m.textContent='Revoked ✓ — their link stops working within ~20s.'; })
-    .catch(e=>{ m.className='msg err'; m.textContent='Could not revoke: '+(e.message||''); });
-}
-function deleteViewer(id, hash){
-  if(!confirm('Permanently delete this viewer and their access? This cannot be undone.')) return;
-  const m=document.getElementById('vmsg'); m.className='msg'; m.textContent='Deleting…';
-  Promise.all([
-    db.ref('access/viewers/'+id).remove(),
-    hash? db.ref('access/tokenHashes/'+hash).remove() : Promise.resolve(),
-    hash? db.ref('access/deviceClaims/'+hash).remove() : Promise.resolve()
-  ])
-    .then(()=>{ m.className='msg ok'; m.textContent='Deleted ✓ — viewer removed and their link is dead.'; })
-    .catch(e=>{ m.className='msg err'; m.textContent='Could not delete: '+(e.message||''); });
 }
 function downloadTemplate(){
   const csv='date,type,label\n'+
